@@ -21,17 +21,19 @@ public:
         std::string content;
     };
 
-    explicit VectorStore(std::unique_ptr<VectorIndex> index);
+    explicit VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality_);
 
-    void Insert(Id id, const Vector& vector, const std::string& content);
+    bool Insert(Id id, const Vector& vector, const std::string& content);
 
-    void Remove(Id id);
+    bool Remove(Id id);
 
-    std::vector<Data> Search(const Vector& query, std::size_t k) const;
+    std::vector<Data> Search(const Vector& query, std::size_t k, std::size_t search_param) const;
 
 private:
     std::unordered_map<Id, Data> store_;
     std::unique_ptr<VectorIndex> index_;
+
+    int vector_dimensionality_;
 };
 
 } // namespace vector_db_engine
