@@ -51,11 +51,28 @@ void HNSWIndex::Remove(Id id) {
 }
 
 std::vector<Id> HNSWIndex::Search(const Vector& query, std::size_t k, std::size_t ef_search) const {
-    // Start with entry point
-    // Go find layer by layer the nearest to uery
-    // return the k nearest at the lowest layer
+    if (!entry_point_.has_value()) {
+        return {};
+    }
 
-    return {};
+    Id entry_point = entry_point_.value();
+
+    for (int i = max_level_; i > 0; --i) {
+        std::vector<Id> nearest = SearchLevel(query, entry_point, ef_search, i);
+
+        if (nearest.empty()) {
+            return {};
+        }
+        entry_point = nearest[0];
+    }
+
+    std::vector<Id> results = SearchLevel(query, entry_point, ef_search, 0);
+
+    if (results.size() > k) {
+        results.resize(k);
+    }
+
+    return results;
 }
 
 std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> entry_point, std::size_t ef, int level) const {
@@ -103,6 +120,8 @@ std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> en
         nearest.push_back(top_ef.top().second);
         top_ef.pop();
     }
+
+    std::reverse(nearest.begin(), nearest.end());
 
     return nearest;
 }
@@ -165,3 +184,5 @@ int HNSWIndex::GetRandomLevel() const {
 }
 
 } // namespace vector_db_engine
+
+#pragma clang diagnostic pop
