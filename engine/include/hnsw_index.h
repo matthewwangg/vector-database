@@ -20,7 +20,7 @@ public:
         Cosine
     };
 
-    explicit HNSWIndex(std::size_t m, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality);
+    explicit HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality);
 
     void Insert(Id id, const Vector& vector) override;
     void Remove(Id id) override;
