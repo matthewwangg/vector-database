@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -15,16 +16,21 @@ using Vector = std::vector<float>;
 
 class VectorStore {
 public:
-    VectorStore(VectorIndex index);
+    struct Data {
+        Vector vector;
+        std::string content;
+    };
 
-    void Insert(Id id, const Vector& vector);
+    explicit VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality);
+
+    void Insert(Id id, const Vector& vector, const std::string& content);
 
     void Remove(Id id);
 
-    std::vector<Id> Search(const Vector& query, std::size_t k) const;
+    std::vector<Data> Search(const Vector& query, std::size_t k) const;
 
 private:
-    std::unordered_map<Id, Vector> store_;
+    std::unordered_map<Id, Data> store_;
     std::unique_ptr<VectorIndex> index_;
 
     int vector_dimensionality_;
