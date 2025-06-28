@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package vector_db;
+
+service VectorDatabase {
+  rpc Insert(InsertRequest) returns (InsertResponse);
+  rpc Remove(RemoveRequest) returns (RemoveResponse);
+  rpc Search(SearchRequest) returns (SearchResponse);
+}
+
+message InsertRequest {
+  uint64 id = 1;
+  repeated float vector = 2;
+  string content = 3;
+}
+
+message InsertResponse {
+  bool successful = 1;
+}
+
+message RemoveRequest{
+  uint64 id = 1;
+}
+
+message RemoveResponse {
+  bool successful = 1;
+}
+
+message SearchRequest {
+  repeated float query = 1;
+  uint32 k = 2;
+  uint32 search_parameter = 3;
+}
+
+message SearchResponse {
+  message Data {
+    uint64 id = 1;
+    string content = 2;
+  }
+  repeated Data data = 1;
+}
