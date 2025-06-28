@@ -6,18 +6,53 @@
 
 namespace vector_db_engine {
 
-HNSWIndex::HNSWIndex(std::size_t m, std::size_t ef_construction, float ml)
+HNSWIndex::HNSWIndex(std::size_t m, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality)
     : m_(m),
       ef_construction_(ef_construction),
       ml_(ml),
       max_level_(-1),
       random_engine_(std::random_device{}()),
       level_distribution_(0.0, 1.0),
-      metric_(DistanceMetric::L2)
+      metric_(metric),
+      vector_dimensionality_(vector_dimensionality)
 {}
 
 void HNSWIndex::Insert(Id id, const Vector& vector) {
+    if (vector.size() != vector_dimensionality_ || nodes_.contains(id)) {
+        return;
+    }
 
+    int new_level = GetRandomLevel();
+    Id entry_point = entry_point_.value();
+
+    nodes_[id] = Node{
+            .vector = vector,
+            .level = new_level,
+            .neighbors = {},
+            .active = true
+    };
+
+    for (int l = max_level_; l > new_level; --l) {
+        std::vector<Id> nearest = SearchLevel(vector, entry_point, 1, l);
+
+        if (nearest.empty()) {
+            return;
+        }
+        entry_point = nearest[0];
+    }
+
+    for (int l = std::min(max_level_, new_level); l > -1; --l) {
+        std::vector<Id> nearest = SearchLevel(vector, entry_point, ef_construction_, l);
+        std::vector<Id> neighbors = SelectNeighbors(vector, nearest);
+
+        ConnectNeighbors(id, vector, neighbors, l);
+    }
+
+    if (new_level > max_level_) {
+        max_level_ = new_level;
+        entry_point_ = id;
+    }
+    node_levels_[new_level].insert(id);
 }
 
 void HNSWIndex::Remove(Id id) {
@@ -57,8 +92,8 @@ std::vector<Id> HNSWIndex::Search(const Vector& query, std::size_t k, std::size_
 
     Id entry_point = entry_point_.value();
 
-    for (int i = max_level_; i > 0; --i) {
-        std::vector<Id> nearest = SearchLevel(query, entry_point, ef_search, i);
+    for (int l = max_level_; l > 0; --l) {
+        std::vector<Id> nearest = SearchLevel(query, entry_point, ef_search, l);
 
         if (nearest.empty()) {
             return {};
@@ -126,7 +161,7 @@ std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> en
     return nearest;
 }
 
-std::vector<Id> HNSWIndex::SelectNeighbors(const vector_db_engine::Vector& query, const std::vector<Id>& candidates) const {
+std::vector<Id> HNSWIndex::SelectNeighbors(const Vector& query, const std::vector<Id>& candidates) const {
     std::vector<std::pair<float, Id>> candidate_distances;
     for (Id potential_neighbor : candidates) {
         float distance = ComputeDistance(query, nodes_.at(potential_neighbor).vector);
@@ -142,7 +177,7 @@ std::vector<Id> HNSWIndex::SelectNeighbors(const vector_db_engine::Vector& query
     return assigned_neighbors;
 }
 
-float HNSWIndex::ComputeDistance(const vector_db_engine::Vector& a, const vector_db_engine::Vector& b) const {
+float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {
     if (a.size() != b.size()) {
         return std::numeric_limits<float>::infinity();
     }
@@ -179,10 +214,27 @@ float HNSWIndex::ComputeDistance(const vector_db_engine::Vector& a, const vector
     return std::numeric_limits<float>::infinity();
 }
 
+void HNSWIndex::ConnectNeighbors(Id node_id, const Vector& vector, const std::vector<Id>& neighbors, int level) {
+    for (Id neighbor_id : neighbors) {
+        nodes_[node_id].neighbors[level].insert(neighbor_id);
+        nodes_[neighbor_id].neighbors[level].insert(node_id);
+
+        auto& e_conn = nodes_[neighbor_id].neighbors[level];
+
+        if (e_conn.size() > m_) {
+            std::vector<Id> candidates(e_conn.begin(), e_conn.end());
+            std::vector<Id> e_new_conn = SelectNeighbors(nodes_[neighbor_id].vector, candidates);
+
+            e_conn.clear();
+            for (Id new_neighbor : e_new_conn) {
+                e_conn.insert(new_neighbor);
+            }
+        }
+    }
+}
+
 int HNSWIndex::GetRandomLevel() const {
     return static_cast<int>(-std::log(1.0 - level_distribution_(random_engine_)) * ml_);
 }
 
 } // namespace vector_db_engine
-
-#pragma clang diagnostic pop

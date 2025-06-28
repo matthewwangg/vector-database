@@ -20,12 +20,10 @@ public:
         Cosine
     };
 
-    explicit HNSWIndex(std::size_t m, std::size_t ef_construction, float ml);
+    explicit HNSWIndex(std::size_t m, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality);
 
     void Insert(Id id, const Vector& vector) override;
-
     void Remove(Id id) override;
-
     std::vector<Id> Search(const Vector& query, std::size_t k, std::size_t ef_search) const override;
 
 private:
@@ -38,6 +36,8 @@ private:
 
     std::unordered_map<Id, Node> nodes_;
     std::unordered_map<int, std::unordered_set<Id>> node_levels_;
+
+    int vector_dimensionality_;
 
     int max_level_;
     std::optional<Id> entry_point_;
@@ -54,6 +54,7 @@ private:
     std::vector<Id> SelectNeighbors(const Vector& query, const std::vector<Id>& candidates) const;
 
     float ComputeDistance(const Vector& a, const Vector& b) const;
+    void ConnectNeighbors(Id node_id, const Vector& vector, const std::vector<Id>& neighbors, int level);
     int GetRandomLevel() const;
 };
 

@@ -26,6 +26,8 @@ public:
 private:
     std::unordered_map<Id, Vector> store_;
     std::unique_ptr<VectorIndex> index_;
+
+    int vector_dimensionality_;
 };
 
 } // namespace vector_db_engine
