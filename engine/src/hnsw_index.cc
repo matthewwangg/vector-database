@@ -1,5 +1,6 @@
 #include "hnsw_index.h"
 
+#include <algorithm>
 #include <queue>
 #include <random>
 
@@ -20,10 +21,40 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
 }
 
 void HNSWIndex::Remove(Id id) {
+    if (!entry_point_.has_value() || !nodes_.contains(id) || !nodes_.at(id).active) {
+        return;
+    }
 
+    nodes_.at(id).active = false;
+
+    int level = nodes_.at(id).level;
+    node_levels_[level].erase(id);
+    if (node_levels_[level].empty()) {
+        node_levels_.erase(level);
+    }
+
+    if (id != entry_point_.value()) {
+        return;
+    }
+
+    entry_point_ = std::nullopt;
+    int new_highest_level = max_level_;
+
+    while (!entry_point_.has_value() && new_highest_level >= 0) {
+        if (node_levels_.contains(new_highest_level)) {
+            entry_point_ = *node_levels_[new_highest_level].begin();
+            break;
+        }
+        new_highest_level--;
+    }
+    max_level_ = new_highest_level;
 }
 
 std::vector<Id> HNSWIndex::Search(const Vector& query, std::size_t k, std::size_t ef_search) const {
+    // Start with entry point
+    // Go find layer by layer the nearest to uery
+    // return the k nearest at the lowest layer
+
     return {};
 }
 
@@ -58,7 +89,7 @@ std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> en
         top_ef.emplace(std::pair<float, Id>(distance, node_id));
 
         for (Id neighbor : nodes_.at(node_id).neighbors.at(level)) {
-            if (visited.contains(neighbor)) {
+            if (visited.contains(neighbor) || !nodes_.at(neighbor).active) {
                 continue;
             }
             float neighbor_distance = ComputeDistance(query, nodes_.at(neighbor).vector);

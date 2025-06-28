@@ -33,9 +33,11 @@ private:
         Vector vector;
         int level;
         std::unordered_map<int, std::unordered_set<Id>> neighbors;
+        bool active;
     };
 
     std::unordered_map<Id, Node> nodes_;
+    std::unordered_map<int, std::unordered_set<Id>> node_levels_;
 
     int max_level_;
     std::optional<Id> entry_point_;
