@@ -76,6 +76,22 @@ std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> en
     return nearest;
 }
 
+std::vector<Id> HNSWIndex::SelectNeighbors(const vector_db_engine::Vector& query, const std::vector<Id>& candidates) const {
+    std::vector<std::pair<float, Id>> candidate_distances;
+    for (Id potential_neighbor : candidates) {
+        float distance = ComputeDistance(query, nodes_.at(potential_neighbor).vector);
+        candidate_distances.emplace_back(distance, potential_neighbor);
+    }
+    std::sort(candidate_distances.begin(), candidate_distances.end());
+
+    std::vector<Id> assigned_neighbors;
+    for (std::size_t i = 0; i < std::min(candidate_distances.size(), m_); ++i) {
+        assigned_neighbors.push_back(candidate_distances.at(i).second);
+    }
+
+    return assigned_neighbors;
+}
+
 float HNSWIndex::ComputeDistance(const vector_db_engine::Vector& a, const vector_db_engine::Vector& b) const {
     if (a.size() != b.size()) {
         return std::numeric_limits<float>::infinity();

@@ -28,8 +28,6 @@ public:
 
     std::vector<Id> Search(const Vector& query, std::size_t k, std::size_t ef_search) const override;
 
-    std::vector<Id> SearchLevel(const Vector& query, std::optional<Id> entry_point, std::size_t ef, int level) const;
-
 private:
     struct Node {
         Vector vector;
@@ -49,6 +47,9 @@ private:
 
     mutable std::mt19937 random_engine_;
     mutable std::uniform_real_distribution<> level_distribution_;
+
+    std::vector<Id> SearchLevel(const Vector& query, std::optional<Id> entry_point, std::size_t ef, int level) const;
+    std::vector<Id> SelectNeighbors(const Vector& query, const std::vector<Id>& candidates) const;
 
     float ComputeDistance(const Vector& a, const Vector& b) const;
     int GetRandomLevel() const;
