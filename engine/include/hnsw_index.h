@@ -44,6 +44,7 @@ private:
 
     std::size_t ef_construction_;
     std::size_t m_;
+    std::size_t m0_;
     float ml_;
     DistanceMetric metric_;
 
@@ -51,7 +52,7 @@ private:
     mutable std::uniform_real_distribution<> level_distribution_;
 
     std::vector<Id> SearchLevel(const Vector& query, std::optional<Id> entry_point, std::size_t ef, int level) const;
-    std::vector<Id> SelectNeighbors(const Vector& query, const std::vector<Id>& candidates) const;
+    std::vector<Id> SelectNeighbors(const Vector& query, const std::vector<Id>& candidates, int level) const;
 
     float ComputeDistance(const Vector& a, const Vector& b) const;
     void ConnectNeighbors(Id node_id, const Vector& vector, const std::vector<Id>& neighbors, int level);

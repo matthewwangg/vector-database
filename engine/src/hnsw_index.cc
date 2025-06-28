@@ -6,8 +6,9 @@
 
 namespace vector_db_engine {
 
-HNSWIndex::HNSWIndex(std::size_t m, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality)
+HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality)
     : m_(m),
+      m0_(m0),
       ef_construction_(ef_construction),
       ml_(ml),
       max_level_(-1),
@@ -51,7 +52,7 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
 
     for (int l = std::min(max_level_, new_level); l > -1; --l) {
         std::vector<Id> nearest = SearchLevel(vector, entry_point, ef_construction_, l);
-        std::vector<Id> neighbors = SelectNeighbors(vector, nearest);
+        std::vector<Id> neighbors = SelectNeighbors(vector, nearest, l);
 
         ConnectNeighbors(id, vector, neighbors, l);
     }
@@ -168,7 +169,7 @@ std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> en
     return nearest;
 }
 
-std::vector<Id> HNSWIndex::SelectNeighbors(const Vector& query, const std::vector<Id>& candidates) const {
+std::vector<Id> HNSWIndex::SelectNeighbors(const Vector& query, const std::vector<Id>& candidates, int level) const {
     std::vector<std::pair<float, Id>> candidate_distances;
     for (Id potential_neighbor : candidates) {
         if (!nodes_.at(potential_neighbor).active) {
@@ -179,8 +180,13 @@ std::vector<Id> HNSWIndex::SelectNeighbors(const Vector& query, const std::vecto
     }
     std::sort(candidate_distances.begin(), candidate_distances.end());
 
+    std::size_t max_neighbors = m_;
+    if (level == 0) {
+        max_neighbors = m0_;
+    }
+
     std::vector<Id> assigned_neighbors;
-    for (std::size_t i = 0; i < std::min(candidate_distances.size(), m_); ++i) {
+    for (std::size_t i = 0; i < std::min(candidate_distances.size(), max_neighbors); ++i) {
         assigned_neighbors.push_back(candidate_distances.at(i).second);
     }
 
@@ -235,9 +241,14 @@ void HNSWIndex::ConnectNeighbors(Id node_id, const Vector& vector, const std::ve
 
         auto& e_conn = nodes_[neighbor_id].neighbors[level];
 
-        if (e_conn.size() > m_) {
+        std::size_t max_neighbors = m_;
+        if (level == 0) {
+            max_neighbors = m0_;
+        }
+
+        if (e_conn.size() > max_neighbors) {
             std::vector<Id> candidates(e_conn.begin(), e_conn.end());
-            std::vector<Id> e_new_conn = SelectNeighbors(nodes_[neighbor_id].vector, candidates);
+            std::vector<Id> e_new_conn = SelectNeighbors(nodes_[neighbor_id].vector, candidates, level);
 
             for (Id old_neighbor : e_conn) {
                 if (std::find(e_new_conn.begin(), e_new_conn.end(), old_neighbor) == e_new_conn.end()) {

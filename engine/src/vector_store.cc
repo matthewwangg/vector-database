@@ -2,9 +2,8 @@
 
 namespace vector_db_engine {
 
-VectorStore::VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
+VectorStore::VectorStore(std::unique_ptr<VectorIndex> index)
     : index_(std::move(index)),
-      vector_dimensionality_(vector_dimensionality)
 {}
 
 void VectorStore::Insert(Id id, const Vector& vector, const std::string& content) {

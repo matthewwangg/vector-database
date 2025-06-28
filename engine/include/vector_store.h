@@ -21,7 +21,7 @@ public:
         std::string content;
     };
 
-    explicit VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality);
+    explicit VectorStore(std::unique_ptr<VectorIndex> index);
 
     void Insert(Id id, const Vector& vector, const std::string& content);
 
@@ -32,8 +32,6 @@ public:
 private:
     std::unordered_map<Id, Data> store_;
     std::unique_ptr<VectorIndex> index_;
-
-    int vector_dimensionality_;
 };
 
 } // namespace vector_db_engine
