@@ -23,7 +23,6 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
     }
 
     int new_level = GetRandomLevel();
-    Id entry_point = entry_point_.value();
 
     nodes_[id] = Node{
             .vector = vector,
@@ -31,6 +30,15 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
             .neighbors = {},
             .active = true
     };
+    node_levels_[new_level].insert(id);
+
+    if (!entry_point_.has_value()) {
+        entry_point_ = id;
+        max_level_ = new_level;
+        return;
+    }
+
+    Id entry_point = entry_point_.value();
 
     for (int l = max_level_; l > new_level; --l) {
         std::vector<Id> nearest = SearchLevel(vector, entry_point, 1, l);
@@ -52,7 +60,6 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
         max_level_ = new_level;
         entry_point_ = id;
     }
-    node_levels_[new_level].insert(id);
 }
 
 void HNSWIndex::Remove(Id id) {
@@ -129,7 +136,6 @@ std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> en
     while (!candidates.empty()) {
         auto [distance, node_id] = candidates.top();
         candidates.pop();
-        visited.insert(node_id);
 
         if (top_ef.size() == ef) {
             if (distance > top_ef.top().first) {
@@ -144,6 +150,7 @@ std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> en
             if (visited.contains(neighbor) || !nodes_.at(neighbor).active) {
                 continue;
             }
+            visited.insert(neighbor);
             float neighbor_distance = ComputeDistance(query, nodes_.at(neighbor).vector);
             candidates.emplace(std::pair<float, Id>(neighbor_distance, neighbor));
         }
@@ -164,6 +171,9 @@ std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> en
 std::vector<Id> HNSWIndex::SelectNeighbors(const Vector& query, const std::vector<Id>& candidates) const {
     std::vector<std::pair<float, Id>> candidate_distances;
     for (Id potential_neighbor : candidates) {
+        if (!nodes_.at(potential_neighbor).active) {
+            continue;
+        }
         float distance = ComputeDistance(query, nodes_.at(potential_neighbor).vector);
         candidate_distances.emplace_back(distance, potential_neighbor);
     }
@@ -185,7 +195,7 @@ float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {
     if (metric_ == DistanceMetric::L2) {
         float distance = 0.0f;
 
-        for (int i = 0; i < a.size(); ++i) {
+        for (size_t i = 0; i < a.size(); ++i) {
             float diff = a[i] - b[i];
             distance += diff * diff;
         }
@@ -197,7 +207,7 @@ float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {
         float a_norm = 0.0f;
         float b_norm = 0.0f;
 
-        for (int i = 0; i < a.size(); ++i) {
+        for (size_t i = 0; i < a.size(); ++i) {
             dot_product += a[i] * b[i];
             a_norm += a[i] * a[i];
             b_norm += b[i] * b[i];
@@ -216,6 +226,10 @@ float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {
 
 void HNSWIndex::ConnectNeighbors(Id node_id, const Vector& vector, const std::vector<Id>& neighbors, int level) {
     for (Id neighbor_id : neighbors) {
+        if (!nodes_.at(neighbor_id).active) {
+            continue;
+        }
+
         nodes_[node_id].neighbors[level].insert(neighbor_id);
         nodes_[neighbor_id].neighbors[level].insert(node_id);
 
@@ -224,6 +238,12 @@ void HNSWIndex::ConnectNeighbors(Id node_id, const Vector& vector, const std::ve
         if (e_conn.size() > m_) {
             std::vector<Id> candidates(e_conn.begin(), e_conn.end());
             std::vector<Id> e_new_conn = SelectNeighbors(nodes_[neighbor_id].vector, candidates);
+
+            for (Id old_neighbor : e_conn) {
+                if (std::find(e_new_conn.begin(), e_new_conn.end(), old_neighbor) == e_new_conn.end()) {
+                    nodes_[old_neighbor].neighbors[level].erase(neighbor_id);
+                }
+            }
 
             e_conn.clear();
             for (Id new_neighbor : e_new_conn) {
