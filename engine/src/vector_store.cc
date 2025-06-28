@@ -20,7 +20,7 @@ void VectorStore::Remove(Id id) {
     index_->Remove(id);
 }
 
-std::vector<Data> VectorStore::Search(const Vector& query, std::size_t k) const {
+std::vector<VectorStore::Data> VectorStore::Search(const Vector& query, std::size_t k) const {
     std::vector<Id> result_ids = index_->Search(query, k, 32);
 
     std::vector<Data> results;
