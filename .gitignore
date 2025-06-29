@@ -228,3 +228,7 @@ cython_debug/
 
 # IDE
 .idea/
+
+# Protobufs
+*.pb.cc
+*.pb.h

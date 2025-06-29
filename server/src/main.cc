@@ -1,0 +1,30 @@
+#include <iostream>
+#include <memory>
+#include <string>
+
+#include <grpcpp/grpcpp.h>
+
+#include "vector_db_service_impl.h"
+#include "vector_store.h"
+#include "hnsw_index.h"
+
+#include "vector_db.grpc.pb.h"
+#include "vector_db.pb.h"
+
+int main(int argc, char* argv[]) {
+    std::string server_address = "0.0.0.0:50051";
+    int vector_dimensionality = 384;
+
+    auto index = std::make_unique<vector_db_engine::HNSWIndex>(16, 32, 128, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, vector_dimensionality);
+    auto store = std::make_unique<vector_db_engine::VectorStore>(std::move(index), vector_dimensionality);
+
+    VectorDatabaseServiceImpl vector_db_service(std::move(store));
+
+    grpc::ServerBuilder builder;
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    builder.RegisterService(&vector_db_service);
+
+    std::cout << "server running on " << server_address << std::endl;
+    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
+    server->Wait();
+}
