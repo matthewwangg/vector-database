@@ -27,6 +27,13 @@ HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction,
     cleanup_thread_ = std::thread(&HNSWIndex::BackgroundCleanupLoop, this);
 }
 
+HNSWIndex::~HNSWIndex() {
+    shutdown_ = true;
+    if (cleanup_thread_.joinable()) {
+        cleanup_thread_.join();
+    }
+}
+
 void HNSWIndex::Insert(Id id, const Vector& vector) {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
 
