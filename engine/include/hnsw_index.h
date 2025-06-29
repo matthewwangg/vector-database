@@ -56,6 +56,7 @@ private:
 
     std::thread cleanup_thread_;
     std::atomic<bool> shutdown_;
+    std::atomic<bool> removed_;
 
     mutable std::shared_mutex rw_mutex_;
 

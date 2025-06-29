@@ -20,7 +20,8 @@ HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction,
       level_distribution_(0.0, 1.0),
       metric_(metric),
       vector_dimensionality_(vector_dimensionality),
-      shutdown_(false)
+      shutdown_(false),
+      removed_(false)
 {
     cleanup_thread_ = std::thread(&HNSWIndex::BackgroundCleanupLoop, this);
 }
@@ -73,6 +74,7 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
 
 void HNSWIndex::Remove(Id id) {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    removed_ = true;
 
     if (!entry_point_.has_value() || !nodes_.contains(id) || !nodes_.at(id).active) {
         return;
