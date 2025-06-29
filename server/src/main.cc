@@ -1,3 +1,4 @@
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -22,6 +23,7 @@ int main(int argc, char* argv[]) {
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
     builder.RegisterService(&vector_db_service);
 
+    std::cout << "server running on " << server_address << std::endl;
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
     server->Wait();
 }
