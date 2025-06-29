@@ -38,10 +38,6 @@ grpc::Status VectorDatabaseServiceImpl::Search(grpc::ServerContext* context, con
 
     std::vector<vector_db_engine::VectorStore::Data> data = store_->Search(query, request->k(), request->search_parameter());
 
-    if (data.empty()) {
-        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "search failed (invalid input)");
-    }
-
     for (const auto& item : data) {
         auto* result = response->add_data();
         result->set_content(item.content);
