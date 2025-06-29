@@ -1,8 +1,12 @@
 #include "hnsw_index.h"
 
 #include <algorithm>
+#include <atomic>
+#include <mutex>
 #include <queue>
 #include <random>
+#include <shared_mutex>
+#include <thread>
 
 namespace vector_db_engine {
 
@@ -15,10 +19,15 @@ HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction,
       random_engine_(std::random_device{}()),
       level_distribution_(0.0, 1.0),
       metric_(metric),
-      vector_dimensionality_(vector_dimensionality)
-{}
+      vector_dimensionality_(vector_dimensionality),
+      shutdown_(false)
+{
+    cleanup_thread_ = std::thread(&HNSWIndex::BackgroundCleanupLoop, this);
+}
 
 void HNSWIndex::Insert(Id id, const Vector& vector) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+
     if (vector.size() != vector_dimensionality_ || nodes_.contains(id)) {
         return;
     }
@@ -63,6 +72,8 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
 }
 
 void HNSWIndex::Remove(Id id) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+
     if (!entry_point_.has_value() || !nodes_.contains(id) || !nodes_.at(id).active) {
         return;
     }
@@ -93,6 +104,8 @@ void HNSWIndex::Remove(Id id) {
 }
 
 std::vector<Id> HNSWIndex::Search(const Vector& query, std::size_t k, std::size_t ef_search) const {
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+
     if (!entry_point_.has_value()) {
         return {};
     }
@@ -194,6 +207,15 @@ std::vector<Id> HNSWIndex::SelectNeighbors(const Vector& query, const std::vecto
     }
 
     return assigned_neighbors;
+}
+
+void HNSWIndex::BackgroundCleanupLoop() {
+
+}
+
+void HNSWIndex::Cleanup() {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+
 }
 
 float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {
