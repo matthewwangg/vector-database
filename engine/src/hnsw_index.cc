@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <queue>
 #include <random>
@@ -212,12 +213,16 @@ std::vector<Id> HNSWIndex::SelectNeighbors(const Vector& query, const std::vecto
 }
 
 void HNSWIndex::BackgroundCleanupLoop() {
-
+    while (!shutdown_) {
+        std::this_thread::sleep_for(std::chrono::seconds(30));
+        Cleanup();
+    }
 }
 
 void HNSWIndex::Cleanup() {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
 
+    removed_ = false;
 }
 
 float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {
