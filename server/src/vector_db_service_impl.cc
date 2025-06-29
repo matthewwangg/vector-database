@@ -49,3 +49,11 @@ grpc::Status VectorDatabaseServiceImpl::Search(grpc::ServerContext* context, con
 
     return grpc::Status::OK;
 }
+
+grpc::Status VectorDatabaseServiceImpl::HealthCheck(grpc::ServerContext* context, const vector_db::Empty* request, vector_db::Status* response) {
+    response->set_successful(true);
+    response->set_message("Healthy!");
+
+    return grpc::Status::OK;
+}
+

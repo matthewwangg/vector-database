@@ -17,7 +17,7 @@ public:
     grpc::Status Insert(grpc::ServerContext* context, const vector_db::InsertRequest* request, vector_db::InsertResponse* response) override;
     grpc::Status Remove(grpc::ServerContext* context, const vector_db::RemoveRequest* request, vector_db::RemoveResponse* response) override;
     grpc::Status Search(grpc::ServerContext* context, const vector_db::SearchRequest* request, vector_db::SearchResponse* response) override;
-
+    grpc::Status HealthCheck(grpc::ServerContext* context, const vector_db::Empty* request, vector_db::Status* response) override;
 private:
     std::unique_ptr<vector_db_engine::VectorStore> store_;
 };

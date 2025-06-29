@@ -6,6 +6,7 @@ service VectorDatabase {
   rpc Insert(InsertRequest) returns (InsertResponse);
   rpc Remove(RemoveRequest) returns (RemoveResponse);
   rpc Search(SearchRequest) returns (SearchResponse);
+  rpc HealthCheck(Empty) returns (Status);
 }
 
 message InsertRequest {
@@ -38,4 +39,11 @@ message SearchResponse {
     string content = 2;
   }
   repeated Data data = 1;
+}
+
+message Empty {}
+
+message Status {
+  bool successful = 1;
+  string message = 2;
 }
