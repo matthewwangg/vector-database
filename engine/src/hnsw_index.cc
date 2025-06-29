@@ -43,9 +43,8 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
 
     for (int l = max_level_; l > new_level; --l) {
         std::vector<Id> nearest = SearchLevel(vector, entry_point, 1, l);
-
         if (nearest.empty()) {
-            return;
+            continue;
         }
         entry_point = nearest[0];
     }
@@ -146,6 +145,10 @@ std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> en
         }
 
         top_ef.emplace(std::pair<float, Id>(distance, node_id));
+
+        if (!nodes_.at(node_id).neighbors.contains(level)) {
+            continue;
+        }
 
         for (Id neighbor : nodes_.at(node_id).neighbors.at(level)) {
             if (visited.contains(neighbor) || !nodes_.at(neighbor).active) {
