@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <iostream>
 #include <mutex>
 #include <queue>
 #include <random>
@@ -221,14 +222,40 @@ std::vector<Id> HNSWIndex::SelectNeighbors(const Vector& query, const std::vecto
 
 void HNSWIndex::BackgroundCleanupLoop() {
     while (!shutdown_) {
-        std::this_thread::sleep_for(std::chrono::seconds(30));
-        Cleanup();
+        std::this_thread::sleep_for(std::chrono::seconds(60));
+        if (removed_) {
+            auto start = std::chrono::steady_clock::now();
+            Cleanup();
+            auto end = std::chrono::steady_clock::now();
+            auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            std::cout << "cleanup completed in " << duration_ms << " ms\n";
+        }
     }
 }
 
 void HNSWIndex::Cleanup() {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    for (auto it = nodes_.begin(); it != nodes_.end();) {
+        Id id = it->first;
+        Node& node = it->second;
 
+        if (!node.active) {
+            it = nodes_.erase(it);
+            continue;
+        }
+
+        for (auto& [level, neighbors] : node.neighbors) {
+            for (auto neighbor_it = neighbors.begin(); neighbor_it != neighbors.end();) {
+                if (!nodes_.contains(*neighbor_it) || !nodes_.at(*neighbor_it).active) {
+                    neighbor_it = neighbors.erase(neighbor_it);
+                    continue;
+                }
+                ++neighbor_it;
+            }
+        }
+
+        ++it;
+    }
     removed_ = false;
 }
 
