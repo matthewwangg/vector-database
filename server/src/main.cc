@@ -16,9 +16,9 @@ int main(int argc, char* argv[]) {
     int vector_dimensionality = 384;
 
     auto index = std::make_unique<vector_db_engine::HNSWIndex>(16, 32, 128, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, vector_dimensionality);
-    auto store = std::make_unique<vector_db_engine::VectorStore>(std::move(index), vector_dimensionality);
+    auto engine = std::make_unique<vector_db_engine::Engine>(std::move(index), vector_dimensionality);
 
-    VectorDatabaseServiceImpl vector_db_service(std::move(store));
+    VectorDatabaseServiceImpl vector_db_service(std::move(engine));
 
     grpc::ServerBuilder builder;
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());

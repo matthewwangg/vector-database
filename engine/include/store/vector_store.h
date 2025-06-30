@@ -22,7 +22,7 @@ public:
         std::string content;
     };
 
-    explicit VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality_);
+    explicit VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality);
 
     bool Insert(Id id, const Vector& vector, const std::string& content);
 
