@@ -106,7 +106,12 @@ void HNSWIndex::Remove(Id id) {
 
     while (!entry_point_.has_value() && new_highest_level >= 0) {
         if (node_levels_.contains(new_highest_level)) {
-            entry_point_ = *node_levels_[new_highest_level].begin();
+            for (auto& candidate : node_levels_.at(new_highest_level)) {
+                if (nodes_.contains(candidate) && nodes_.at(candidate).active) {
+                    entry_point_ = candidate;
+                    break;
+                }
+            }
             break;
         }
         new_highest_level--;
