@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -34,6 +35,8 @@ private:
     std::unique_ptr<VectorIndex> index_;
 
     int vector_dimensionality_;
+
+    mutable std::shared_mutex rw_mutex_;
 };
 
 } // namespace vector_db_engine

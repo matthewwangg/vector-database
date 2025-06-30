@@ -1,5 +1,9 @@
 #include "vector_store.h"
 
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
+
 namespace vector_db_engine {
 
 VectorStore::VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
@@ -7,6 +11,7 @@ VectorStore::VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensio
 {}
 
 bool VectorStore::Insert(Id id, const Vector& vector, const std::string& content) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     if (store_.contains(id) || vector.size() != vector_dimensionality_) {
         return false;
     }
@@ -21,6 +26,7 @@ bool VectorStore::Insert(Id id, const Vector& vector, const std::string& content
 }
 
 bool VectorStore::Remove(Id id) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     if (!store_.contains(id)) {
         return false;
     }
@@ -32,6 +38,7 @@ bool VectorStore::Remove(Id id) {
 }
 
 std::vector<VectorStore::Data> VectorStore::Search(const Vector& query, std::size_t k, std::size_t search_param) const {
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
     if (query.size() != vector_dimensionality_) {
         return {};
     }

@@ -1,10 +1,13 @@
 #ifndef VECTOR_DATABASE_HNSW_INDEX_H
 #define VECTOR_DATABASE_HNSW_INDEX_H
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <random>
+#include <shared_mutex>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -21,6 +24,7 @@ public:
     };
 
     explicit HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality);
+    ~HNSWIndex() override;
 
     void Insert(Id id, const Vector& vector) override;
     void Remove(Id id) override;
@@ -51,8 +55,17 @@ private:
     mutable std::mt19937 random_engine_;
     mutable std::uniform_real_distribution<> level_distribution_;
 
+    std::thread cleanup_thread_;
+    std::atomic<bool> shutdown_;
+    std::atomic<bool> removed_;
+
+    mutable std::shared_mutex rw_mutex_;
+
     std::vector<Id> SearchLevel(const Vector& query, std::optional<Id> entry_point, std::size_t ef, int level) const;
     std::vector<Id> SelectNeighbors(const Vector& query, const std::vector<Id>& candidates, int level) const;
+
+    void BackgroundCleanupLoop();
+    void Cleanup();
 
     float ComputeDistance(const Vector& a, const Vector& b) const;
     void ConnectNeighbors(Id node_id, const Vector& vector, const std::vector<Id>& neighbors, int level);

@@ -1,8 +1,14 @@
 #include "hnsw_index.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <iostream>
+#include <mutex>
 #include <queue>
 #include <random>
+#include <shared_mutex>
+#include <thread>
 
 namespace vector_db_engine {
 
@@ -15,10 +21,23 @@ HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction,
       random_engine_(std::random_device{}()),
       level_distribution_(0.0, 1.0),
       metric_(metric),
-      vector_dimensionality_(vector_dimensionality)
-{}
+      vector_dimensionality_(vector_dimensionality),
+      shutdown_(false),
+      removed_(false)
+{
+    cleanup_thread_ = std::thread(&HNSWIndex::BackgroundCleanupLoop, this);
+}
+
+HNSWIndex::~HNSWIndex() {
+    shutdown_ = true;
+    if (cleanup_thread_.joinable()) {
+        cleanup_thread_.join();
+    }
+}
 
 void HNSWIndex::Insert(Id id, const Vector& vector) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+
     if (vector.size() != vector_dimensionality_ || nodes_.contains(id)) {
         return;
     }
@@ -63,6 +82,9 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
 }
 
 void HNSWIndex::Remove(Id id) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    removed_ = true;
+
     if (!entry_point_.has_value() || !nodes_.contains(id) || !nodes_.at(id).active) {
         return;
     }
@@ -84,7 +106,12 @@ void HNSWIndex::Remove(Id id) {
 
     while (!entry_point_.has_value() && new_highest_level >= 0) {
         if (node_levels_.contains(new_highest_level)) {
-            entry_point_ = *node_levels_[new_highest_level].begin();
+            for (auto& candidate : node_levels_.at(new_highest_level)) {
+                if (nodes_.contains(candidate) && nodes_.at(candidate).active) {
+                    entry_point_ = candidate;
+                    break;
+                }
+            }
             break;
         }
         new_highest_level--;
@@ -93,6 +120,8 @@ void HNSWIndex::Remove(Id id) {
 }
 
 std::vector<Id> HNSWIndex::Search(const Vector& query, std::size_t k, std::size_t ef_search) const {
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+
     if (!entry_point_.has_value()) {
         return {};
     }
@@ -194,6 +223,45 @@ std::vector<Id> HNSWIndex::SelectNeighbors(const Vector& query, const std::vecto
     }
 
     return assigned_neighbors;
+}
+
+void HNSWIndex::BackgroundCleanupLoop() {
+    while (!shutdown_) {
+        std::this_thread::sleep_for(std::chrono::seconds(60));
+        if (removed_) {
+            auto start = std::chrono::steady_clock::now();
+            Cleanup();
+            auto end = std::chrono::steady_clock::now();
+            auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            std::cout << "cleanup completed in " << duration_ms << " ms\n";
+        }
+    }
+}
+
+void HNSWIndex::Cleanup() {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    for (auto it = nodes_.begin(); it != nodes_.end();) {
+        Id id = it->first;
+        Node& node = it->second;
+
+        if (!node.active) {
+            it = nodes_.erase(it);
+            continue;
+        }
+
+        for (auto& [level, neighbors] : node.neighbors) {
+            for (auto neighbor_it = neighbors.begin(); neighbor_it != neighbors.end();) {
+                if (!nodes_.contains(*neighbor_it) || !nodes_.at(*neighbor_it).active) {
+                    neighbor_it = neighbors.erase(neighbor_it);
+                    continue;
+                }
+                ++neighbor_it;
+            }
+        }
+
+        ++it;
+    }
+    removed_ = false;
 }
 
 float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {
