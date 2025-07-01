@@ -3,11 +3,19 @@
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
+#include <unordered_map>
 
 namespace vector_db_engine {
 
 VectorStore::VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
-    : index_(std::move(index)), vector_dimensionality_(vector_dimensionality)
+    : index_(std::move(index)),
+      vector_dimensionality_(vector_dimensionality)
+{}
+
+VectorStore::VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality, std::unordered_map<vector_db_engine::Id, Data> store)
+    : index_(std::move(index)),
+      vector_dimensionality_(vector_dimensionality),
+      store_(store)
 {}
 
 bool VectorStore::Insert(Id id, const Vector& vector, const std::string& content) {

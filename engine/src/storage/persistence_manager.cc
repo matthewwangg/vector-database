@@ -1,5 +1,8 @@
 #include "persistence_manager.h"
 
+#include <fstream>
+#include <string>
+
 #include "vector_store.h"
 
 namespace vector_db_engine {

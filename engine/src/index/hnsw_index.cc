@@ -7,6 +7,8 @@
 #include <random>
 #include <shared_mutex>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace vector_db_engine {
 
@@ -21,6 +23,33 @@ HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction,
       metric_(metric),
       vector_dimensionality_(vector_dimensionality)
 {}
+
+HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality, std::unordered_map<Id, Node> nodes, std::unordered_map<int, std::unordered_set<Id>> node_levels)
+    : m_(m),
+      m0_(m0),
+      ef_construction_(ef_construction),
+      ml_(ml),
+      max_level_(-1),
+      random_engine_(std::random_device{}()),
+      level_distribution_(0.0, 1.0),
+      metric_(metric),
+      vector_dimensionality_(vector_dimensionality),
+      nodes_(nodes),
+      node_levels_(node_levels)
+{
+    for (const auto& [level, ids] : node_levels_) {
+        if (level > max_level_) {
+            max_level_ = level;
+        }
+    }
+
+    for (const auto& [id, node] : nodes_) {
+        if (node.level == max_level_ && node.active) {
+            entry_point_ = id;
+            break;
+        }
+    }
+}
 
 void HNSWIndex::Insert(Id id, const Vector& vector) {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
