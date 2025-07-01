@@ -16,7 +16,6 @@ constexpr int kCleanupInterval = 60;
 inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
 
-
 Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
     : store_(std::make_unique<VectorStore>(std::move(index), vector_dimensionality)),
       persistence_manager_(std::make_unique<VectorPersistenceManager>(kStoreSnapshotFilename, kIndexSnapshotFilename)),
@@ -36,15 +35,27 @@ Engine::~Engine() {
 }
 
 bool Engine::Insert(Id id, const Vector& vector, const std::string& content) {
+    if (shutdown_) {
+        return false;
+    }
+
     return store_->Insert(id, vector, content);
 }
 
 bool Engine::Remove(Id id) {
+    if (shutdown_) {
+        return false;
+    }
+
     removed_ = true;
     return store_->Remove(id);
 }
 
 std::vector<VectorStore::Data> Engine::Search(const Vector& query, std::size_t k, std::size_t search_param) const {
+    if (shutdown_) {
+        return {};
+    }
+
     return store_->Search(query, k, search_param);
 }
 
