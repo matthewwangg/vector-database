@@ -28,6 +28,7 @@ Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
 
 Engine::~Engine() {
     shutdown_ = true;
+    cleanup_cv_.notify_one();
     if (cleanup_thread_.joinable()) {
         cleanup_thread_.join();
     }
@@ -60,9 +61,15 @@ std::vector<VectorStore::Data> Engine::Search(const Vector& query, std::size_t k
 }
 
 void Engine::BackgroundCleanupLoop() {
+    std::unique_lock<std::mutex> lock(cleanup_mutex_);
     while (!shutdown_) {
-        std::this_thread::sleep_for(std::chrono::seconds(kCleanupInterval));
-        if (removed_) {
+        cleanup_cv_.wait_for(lock, std::chrono::seconds(kCleanupInterval));
+
+        if (shutdown_) {
+            break;
+        }
+
+        if (!removed_) {
             auto start = std::chrono::steady_clock::now();
             Cleanup();
             auto end = std::chrono::steady_clock::now();

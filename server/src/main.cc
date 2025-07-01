@@ -50,10 +50,12 @@ int main(int argc, char* argv[]) {
         while (!shutdown) {
             std::this_thread::sleep_for(std::chrono::milliseconds(kShutdownCheckInterval));
         }
+        std::cout << "server shutting down..." << std::endl;
         server->Shutdown();
     });
 
     server->Wait();
+    shutdown_thread.join();
 
-    std::cout << "server shutting down..." << std::endl;
+    return 0;
 }

@@ -2,6 +2,7 @@
 #define VECTOR_DATABASE_ENGINE_H
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -32,6 +33,8 @@ private:
     std::thread cleanup_thread_;
     std::atomic<bool> shutdown_;
     std::atomic<bool> removed_;
+    std::condition_variable cleanup_cv_;
+    std::mutex cleanup_mutex_;
 };
 
 }
