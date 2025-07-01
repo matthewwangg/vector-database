@@ -2,8 +2,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
-#include <iostream>
 #include <mutex>
 #include <queue>
 #include <random>
@@ -21,19 +19,8 @@ HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction,
       random_engine_(std::random_device{}()),
       level_distribution_(0.0, 1.0),
       metric_(metric),
-      vector_dimensionality_(vector_dimensionality),
-      shutdown_(false),
-      removed_(false)
-{
-    cleanup_thread_ = std::thread(&HNSWIndex::BackgroundCleanupLoop, this);
-}
-
-HNSWIndex::~HNSWIndex() {
-    shutdown_ = true;
-    if (cleanup_thread_.joinable()) {
-        cleanup_thread_.join();
-    }
-}
+      vector_dimensionality_(vector_dimensionality)
+{}
 
 void HNSWIndex::Insert(Id id, const Vector& vector) {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
@@ -83,7 +70,6 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
 
 void HNSWIndex::Remove(Id id) {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
-    removed_ = true;
 
     if (!entry_point_.has_value() || !nodes_.contains(id) || !nodes_.at(id).active) {
         return;
@@ -225,19 +211,6 @@ std::vector<Id> HNSWIndex::SelectNeighbors(const Vector& query, const std::vecto
     return assigned_neighbors;
 }
 
-void HNSWIndex::BackgroundCleanupLoop() {
-    while (!shutdown_) {
-        std::this_thread::sleep_for(std::chrono::seconds(60));
-        if (removed_) {
-            auto start = std::chrono::steady_clock::now();
-            Cleanup();
-            auto end = std::chrono::steady_clock::now();
-            auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-            std::cout << "cleanup completed in " << duration_ms << " ms\n";
-        }
-    }
-}
-
 void HNSWIndex::Cleanup() {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     for (auto it = nodes_.begin(); it != nodes_.end();) {
@@ -261,7 +234,6 @@ void HNSWIndex::Cleanup() {
 
         ++it;
     }
-    removed_ = false;
 }
 
 float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {

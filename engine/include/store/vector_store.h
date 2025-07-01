@@ -25,10 +25,10 @@ public:
     explicit VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality);
 
     bool Insert(Id id, const Vector& vector, const std::string& content);
-
     bool Remove(Id id);
-
     std::vector<Data> Search(const Vector& query, std::size_t k, std::size_t search_param) const;
+
+    void Cleanup();
 
 private:
     std::unordered_map<Id, Data> store_;

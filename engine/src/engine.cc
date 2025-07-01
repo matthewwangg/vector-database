@@ -1,6 +1,8 @@
 #include "engine.h"
 
 #include <cstdint>
+#include <chrono>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -9,20 +11,52 @@
 
 namespace vector_db_engine {
 
+constexpr int kCleanupInterval = 60;
+
 Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
-    : store_(std::make_unique<VectorStore>(std::move(index), vector_dimensionality))
-{}
+    : store_(std::make_unique<VectorStore>(std::move(index), vector_dimensionality)),
+      shutdown_(false),
+      removed_(false)
+{
+    cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
+}
+
+Engine::~Engine() {
+    shutdown_ = true;
+    if (cleanup_thread_.joinable()) {
+        cleanup_thread_.join();
+    }
+}
 
 bool Engine::Insert(Id id, const Vector& vector, const std::string& content) {
     return store_->Insert(id, vector, content);
 }
 
 bool Engine::Remove(Id id) {
+    removed_ = true;
     return store_->Remove(id);
 }
 
 std::vector<VectorStore::Data> Engine::Search(const Vector& query, std::size_t k, std::size_t search_param) const {
     return store_->Search(query, k, search_param);
+}
+
+void Engine::BackgroundCleanupLoop() {
+    while (!shutdown_) {
+        std::this_thread::sleep_for(std::chrono::seconds(kCleanupInterval));
+        if (removed_) {
+            auto start = std::chrono::steady_clock::now();
+            Cleanup();
+            auto end = std::chrono::steady_clock::now();
+            auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            std::cout << "cleanup completed in " << duration_ms << " ms\n";
+        }
+    }
+}
+
+void Engine::Cleanup() {
+    store_->Cleanup();
+    removed_ = false;
 }
 
 } // namespace vector_db_engine

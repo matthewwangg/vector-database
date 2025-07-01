@@ -56,4 +56,9 @@ std::vector<VectorStore::Data> VectorStore::Search(const Vector& query, std::siz
     return results;
 }
 
+void VectorStore::Cleanup() {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    index_->Cleanup();
+}
+
 } // namespace vector_db_engine
