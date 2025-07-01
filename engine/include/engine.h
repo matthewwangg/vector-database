@@ -27,6 +27,7 @@ public:
 
 private:
     std::unique_ptr<VectorStore> store_;
+    std::unique_ptr<VectorPersistenceManager> persistence_manager_;
 
     std::thread cleanup_thread_;
     std::atomic<bool> shutdown_;

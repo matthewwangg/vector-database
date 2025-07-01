@@ -13,12 +13,18 @@ namespace vector_db_engine {
 
 constexpr int kCleanupInterval = 60;
 
+inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
+inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
+
+
 Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
     : store_(std::make_unique<VectorStore>(std::move(index), vector_dimensionality)),
+      persistence_manager_(std::make_unique<VectorPersistenceManager>(kStoreSnapshotFilename, kIndexSnapshotFilename)),
       shutdown_(false),
       removed_(false)
 {
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
+    persistence_manager_->LoadSnapshot(*store_);
 }
 
 Engine::~Engine() {
@@ -26,6 +32,7 @@ Engine::~Engine() {
     if (cleanup_thread_.joinable()) {
         cleanup_thread_.join();
     }
+    persistence_manager_->SaveSnapshot(*store_);
 }
 
 bool Engine::Insert(Id id, const Vector& vector, const std::string& content) {
