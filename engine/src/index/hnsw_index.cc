@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <random>
 #include <shared_mutex>
@@ -24,29 +25,26 @@ HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction,
       vector_dimensionality_(vector_dimensionality)
 {}
 
-HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality, std::unordered_map<Id, Node> nodes, std::unordered_map<int, std::unordered_set<Id>> node_levels)
+HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality, int max_level, std::optional<Id> entry_point, std::unordered_map<Id, Node> nodes, std::unordered_map<int, std::unordered_set<Id>> node_levels)
     : m_(m),
       m0_(m0),
       ef_construction_(ef_construction),
       ml_(ml),
-      max_level_(-1),
+      max_level_(max_level),
       random_engine_(std::random_device{}()),
       level_distribution_(0.0, 1.0),
       metric_(metric),
       vector_dimensionality_(vector_dimensionality),
+      entry_point_(entry_point),
       nodes_(nodes),
       node_levels_(node_levels)
 {
-    for (const auto& [level, ids] : node_levels_) {
-        if (level > max_level_) {
-            max_level_ = level;
-        }
-    }
-
-    for (const auto& [id, node] : nodes_) {
-        if (node.level == max_level_ && node.active) {
-            entry_point_ = id;
-            break;
+    if (!entry_point_.has_value()) {
+        for (const auto& [id, node] : nodes_) {
+            if (node.level == max_level_ && node.active) {
+                entry_point_ = id;
+                break;
+            }
         }
     }
 }
