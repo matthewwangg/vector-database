@@ -35,6 +35,7 @@ Engine::~Engine() {
     if (cleanup_thread_.joinable()) {
         cleanup_thread_.join();
     }
+    Cleanup();
     persistence_manager_->SaveSnapshot(*store_);
 }
 
