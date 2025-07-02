@@ -103,7 +103,6 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
     vector_db::IndexSnapshot index_snapshot;
     std::ifstream in_index(index_snapshot_file_path_, std::ios::binary);
     if (!in_index) {
-        std::cout << "failed to open index file" << std::endl;
         return nullptr;
     }
     index_snapshot.ParseFromIstream(&in_index);
@@ -150,7 +149,6 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
     vector_db::StoreSnapshot store_snapshot;
     std::ifstream in_store(store_snapshot_file_path_, std::ios::binary);
     if (!in_store) {
-        std::cout << "failed to open store file" << std::endl;
         return nullptr;
     }
     store_snapshot.ParseFromIstream(&in_store);
@@ -164,7 +162,7 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
 
     std::unique_ptr<VectorStore> loaded_store = std::make_unique<VectorStore>(std::move(reconstructed_index), store_snapshot.vector_dimensionality(), reconstructed_store);
 
-    std::cout << "snapshot loaded successfully" << std::endl;
+    std::cout << "snapshot loaded successfully with " << store_snapshot.vector_entry_size() << " vectors, " << index_snapshot.nodes_size() << " index nodes, and dimensionality of " << store_snapshot.vector_dimensionality() << std::endl;
 
     return std::move(loaded_store);
 }
