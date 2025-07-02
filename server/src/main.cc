@@ -11,8 +11,8 @@
 #include "vector_store.h"
 #include "hnsw_index.h"
 
-#include "vector_db.grpc.pb.h"
-#include "vector_db.pb.h"
+#include "server.grpc.pb.h"
+#include "server.pb.h"
 
 constexpr int kShutdownCheckInterval = 1000;
 

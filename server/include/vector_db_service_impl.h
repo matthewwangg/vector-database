@@ -7,7 +7,7 @@
 
 #include "engine.h"
 
-#include "vector_db.grpc.pb.h"
+#include "server.grpc.pb.h"
 
 class VectorDatabaseServiceImpl : public vector_db::VectorDatabase::Service {
 public:
