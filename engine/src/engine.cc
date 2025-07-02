@@ -22,8 +22,11 @@ Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
       shutdown_(false),
       removed_(false)
 {
+    std::unique_ptr<VectorStore> loaded_store = persistence_manager_->LoadSnapshot();
+    if (loaded_store) {
+        store_ = std::move(loaded_store);
+    }
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
-    persistence_manager_->LoadSnapshot(*store_);
 }
 
 Engine::~Engine() {
@@ -69,7 +72,7 @@ void Engine::BackgroundCleanupLoop() {
             break;
         }
 
-        if (!removed_) {
+        if (removed_) {
             auto start = std::chrono::steady_clock::now();
             Cleanup();
             auto end = std::chrono::steady_clock::now();

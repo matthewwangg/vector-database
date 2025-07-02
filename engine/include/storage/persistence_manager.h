@@ -1,6 +1,7 @@
 #ifndef VECTOR_DATABASE_STORAGE_H
 #define VECTOR_DATABASE_STORAGE_H
 
+#include <memory>
 #include <string>
 
 #include "vector_store.h"
@@ -12,7 +13,7 @@ public:
     VectorPersistenceManager(std::string store_snapshot_file_path, std::string index_snapshot_file_path);
 
     void SaveSnapshot(const VectorStore& store) const;
-    void LoadSnapshot(VectorStore& store) const;
+    std::unique_ptr<VectorStore> LoadSnapshot() const;
 
 private:
     std::string store_snapshot_file_path_;
