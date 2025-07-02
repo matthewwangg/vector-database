@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package vector_db;
+
+message StoreSnapshot {
+  repeated VectorEntry vector_entry = 1;
+  int32 vector_dimensionality = 2;
+}
+
+message VectorEntry {
+  uint64 id = 1;
+  repeated float vector = 2;
+  string content = 3;
+}
+
+message IndexSnapshot {
+  uint64 m = 1;
+  uint64 m0 = 2;
+  uint64 ef_construction = 3;
+  float ml = 4;
+
+  enum DistanceMetric {
+    L2 = 0;
+    COSINE = 1;
+  }
+
+  DistanceMetric distance_metric = 5;
+  int32 vector_dimensionality = 6;
+  int64 max_level = 7;
+  uint64 entry_point = 8;
+  map<uint64, Node> nodes = 9;
+  map<int64, IdSet> node_levels = 10;
+}
+
+message Node {
+  repeated float vector = 1;
+  int64 level = 2;
+  map<int64, IdSet> neighbors = 3;
+  bool active = 4;
+}
+
+message IdSet {
+  repeated uint64 id = 1;
+}
