@@ -25,6 +25,7 @@ Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
     std::unique_ptr<VectorStore> loaded_store = persistence_manager_->LoadSnapshot();
     if (loaded_store) {
         store_ = std::move(loaded_store);
+        stats_.vector_count = store_->GetStore().size();
     }
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
 }
@@ -44,7 +45,11 @@ bool Engine::Insert(Id id, const Vector& vector, const std::string& content) {
         return false;
     }
 
-    return store_->Insert(id, vector, content);
+    bool ok = store_->Insert(id, vector, content);
+    if (ok) {
+        stats_.vector_count++;
+    }
+    return ok;
 }
 
 bool Engine::Remove(Id id) {
@@ -52,8 +57,12 @@ bool Engine::Remove(Id id) {
         return false;
     }
 
-    removed_ = true;
-    return store_->Remove(id);
+    bool ok = store_->Remove(id);
+    if (ok) {
+        removed_ = true;
+        stats_.deleted_count++;
+    }
+    return ok;
 }
 
 std::vector<VectorStore::Data> Engine::Search(const Vector& query, std::size_t k, std::size_t search_param) const {
@@ -62,6 +71,10 @@ std::vector<VectorStore::Data> Engine::Search(const Vector& query, std::size_t k
     }
 
     return store_->Search(query, k, search_param);
+}
+
+Engine::Stats Engine::GetStats() const {
+    return stats_;
 }
 
 void Engine::BackgroundCleanupLoop() {
@@ -86,6 +99,8 @@ void Engine::BackgroundCleanupLoop() {
 void Engine::Cleanup() {
     store_->Cleanup();
     removed_ = false;
+    stats_.vector_count = stats_.vector_count - stats_.deleted_count;
+    stats_.deleted_count = 0;
 }
 
 } // namespace vector_db_engine

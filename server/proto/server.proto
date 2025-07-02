@@ -6,6 +6,8 @@ service VectorDatabase {
   rpc Insert(InsertRequest) returns (InsertResponse);
   rpc Remove(RemoveRequest) returns (RemoveResponse);
   rpc Search(SearchRequest) returns (SearchResponse);
+  rpc Stats(StatsRequest) returns (StatsResponse);
+
   rpc HealthCheck(Empty) returns (Status);
 }
 
@@ -46,4 +48,11 @@ message Empty {}
 message Status {
   bool successful = 1;
   string message = 2;
+}
+
+message StatsRequest {}
+
+message StatsResponse {
+  uint64 vector_count = 1;
+  uint64 deleted_count = 2;
 }

@@ -16,6 +16,11 @@ namespace vector_db_engine {
 
 class Engine {
 public:
+    struct Stats {
+        uint64_t vector_count = 0;
+        uint64_t deleted_count = 0;
+    };
+
     explicit Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality);
     ~Engine();
 
@@ -23,12 +28,16 @@ public:
     bool Remove(Id id);
     std::vector<VectorStore::Data> Search(const Vector& query, std::size_t k, std::size_t search_param) const;
 
+    Stats GetStats() const;
+
     void BackgroundCleanupLoop();
     void Cleanup();
 
 private:
     std::unique_ptr<VectorStore> store_;
     std::unique_ptr<VectorPersistenceManager> persistence_manager_;
+
+    Stats stats_;
 
     std::thread cleanup_thread_;
     std::atomic<bool> shutdown_;

@@ -46,10 +46,18 @@ grpc::Status VectorDatabaseServiceImpl::Search(grpc::ServerContext* context, con
     return grpc::Status::OK;
 }
 
+grpc::Status VectorDatabaseServiceImpl::Stats(grpc::ServerContext* context, const vector_db::StatsRequest* request, vector_db::StatsResponse* response) {
+    vector_db_engine::Engine::Stats stats = engine_->GetStats();
+
+    response->set_vector_count(stats.vector_count);
+    response->set_deleted_count(stats.deleted_count);
+
+    return grpc::Status::OK;
+}
+
 grpc::Status VectorDatabaseServiceImpl::HealthCheck(grpc::ServerContext* context, const vector_db::Empty* request, vector_db::Status* response) {
     response->set_successful(true);
     response->set_message("Healthy!");
 
     return grpc::Status::OK;
 }
-
