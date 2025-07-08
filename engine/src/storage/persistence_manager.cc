@@ -1,7 +1,9 @@
 #include "persistence_manager.h"
 
+#include <filesystem>
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "hnsw_index.h"
@@ -11,10 +13,16 @@
 
 namespace vector_db_engine {
 
-VectorPersistenceManager::VectorPersistenceManager(std::string store_snapshot_file_path, std::string index_snapshot_file_path)
+VectorPersistenceManager::VectorPersistenceManager(std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path)
     : store_snapshot_file_path_(store_snapshot_file_path),
-      index_snapshot_file_path_(index_snapshot_file_path)
-{}
+      index_snapshot_file_path_(index_snapshot_file_path),
+      wal_file_path_(wal_file_path)
+{
+    wal_out_.open(wal_file_path_, std::ios::app);
+    if (!wal_out_) {
+        std::cout << "failed to open write-ahead log" << std::endl;
+    }
+}
 
 void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
     vector_db::StoreSnapshot store_snapshot;
@@ -96,6 +104,10 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
     }
     index_snapshot.SerializeToOstream(&out_index);
 
+    if (!std::filesystem::exists(store_snapshot_file_path_) || std::filesystem::file_size(store_snapshot_file_path_) == 0) {
+        return;
+    }
+
     std::cout << "snapshot saved successfully" << std::endl;
 }
 
@@ -162,9 +174,88 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
 
     std::unique_ptr<VectorStore> loaded_store = std::make_unique<VectorStore>(std::move(reconstructed_index), store_snapshot.vector_dimensionality(), reconstructed_store);
 
+    if (loaded_store->GetStore().size() == 0) {
+        return nullptr;
+    }
+
     std::cout << "snapshot loaded successfully with " << store_snapshot.vector_entry_size() << " vectors, " << index_snapshot.nodes_size() << " index nodes, and dimensionality of " << store_snapshot.vector_dimensionality() << std::endl;
 
     return std::move(loaded_store);
+}
+
+void VectorPersistenceManager::AppendInsert(Id id, const Vector& vector, const std::string& content) {
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+    wal_out_ << "insert " << id;
+    for (float value : vector) {
+        wal_out_ << " " << value;
+    }
+    wal_out_ << " | " << content;
+    wal_out_ << "\n";
+    wal_out_.flush();
+}
+
+void VectorPersistenceManager::AppendRemove(Id id) {
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+    wal_out_ << "remove " << id << "\n";
+    wal_out_.flush();
+}
+
+void VectorPersistenceManager::ReplayWAL(VectorStore& store) {
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+
+    bool replay = false;
+
+    std::ifstream wal_in(wal_file_path_);
+    if (!wal_in) {
+        return;
+    }
+
+    std::string line;
+    while (std::getline(wal_in, line)) {
+        replay = true;
+        std::istringstream stream(line);
+        std::string command;
+        stream >> command;
+
+        Id id;
+        stream >> id;
+        if (command == "insert") {
+            Vector vector;
+            float value;
+            while (stream >> value)  {
+                vector.push_back(value);
+            }
+
+            stream.clear();
+            stream >> std::ws;
+
+            std::string content;
+            std::getline(stream, content);
+            store.Insert(id, vector, content);
+        }
+        if (command == "remove") {
+            store.Remove(id);
+        }
+    }
+
+    if (!replay) {
+        return;
+    }
+
+    std::cout << "write-ahead log replay completed" << std::endl;
+}
+
+void VectorPersistenceManager::ClearWAL() {
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+
+    bool clear = std::filesystem::exists(wal_file_path_) && std::filesystem::file_size(wal_file_path_) > 0;
+    std::ofstream clear_log(wal_file_path_, std::ios::trunc);
+
+    if (!clear) {
+        return;
+    }
+
+    std::cout << "write-ahead log cleared" << std::endl;
 }
 
 } // namespace vector_db_engine

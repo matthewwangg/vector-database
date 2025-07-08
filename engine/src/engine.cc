@@ -15,18 +15,23 @@ constexpr int kCleanupInterval = 60;
 
 inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
+inline const std::string kWriteAheadLogFilename = "wal.log";
 
 Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
     : store_(std::make_unique<VectorStore>(std::move(index), vector_dimensionality)),
-      persistence_manager_(std::make_unique<VectorPersistenceManager>(kStoreSnapshotFilename, kIndexSnapshotFilename)),
+      persistence_manager_(std::make_unique<VectorPersistenceManager>(kStoreSnapshotFilename, kIndexSnapshotFilename, kWriteAheadLogFilename)),
       shutdown_(false),
       removed_(false)
 {
     std::unique_ptr<VectorStore> loaded_store = persistence_manager_->LoadSnapshot();
     if (loaded_store) {
+        persistence_manager_->ReplayWAL(*loaded_store);
         store_ = std::move(loaded_store);
-        stats_.vector_count = store_->GetStore().size();
+    } else {
+        persistence_manager_->ReplayWAL(*store_);
     }
+
+    stats_.vector_count = store_->GetStore().size();
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
 }
 
@@ -38,12 +43,15 @@ Engine::~Engine() {
     }
     Cleanup();
     persistence_manager_->SaveSnapshot(*store_);
+    persistence_manager_->ClearWAL();
 }
 
 bool Engine::Insert(Id id, const Vector& vector, const std::string& content) {
     if (shutdown_) {
         return false;
     }
+
+    persistence_manager_->AppendInsert(id, vector, content);
 
     bool ok = store_->Insert(id, vector, content);
     if (ok) {
@@ -56,6 +64,8 @@ bool Engine::Remove(Id id) {
     if (shutdown_) {
         return false;
     }
+
+    persistence_manager_->AppendRemove(id);
 
     bool ok = store_->Remove(id);
     if (ok) {
