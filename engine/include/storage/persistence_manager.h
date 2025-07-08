@@ -17,15 +17,15 @@ using Vector = std::vector<float>;
 
 class VectorPersistenceManager {
 public:
-    VectorPersistenceManager(std::string store_snapshot_file_path, std::string index_snapshot_file_path);
+    VectorPersistenceManager(std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path);
 
     void SaveSnapshot(const VectorStore& store) const;
     std::unique_ptr<VectorStore> LoadSnapshot() const;
 
-    void AppendInsert(Id id, const Vector& vector) const;
-    void AppendRemove(Id id) const;
-    void ReplayWAL(VectorStore& store) const;
-    void ClearWAL() const;
+    void AppendInsert(Id id, const Vector& vector);
+    void AppendRemove(Id id);
+    void ReplayWAL(VectorStore& store);
+    void ClearWAL();
 
 private:
     std::string store_snapshot_file_path_;

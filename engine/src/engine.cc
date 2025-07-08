@@ -15,10 +15,11 @@ constexpr int kCleanupInterval = 60;
 
 inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
+inline const std::string kWriteAheadLogFilename = "wal.log";
 
 Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
     : store_(std::make_unique<VectorStore>(std::move(index), vector_dimensionality)),
-      persistence_manager_(std::make_unique<VectorPersistenceManager>(kStoreSnapshotFilename, kIndexSnapshotFilename)),
+      persistence_manager_(std::make_unique<VectorPersistenceManager>(kStoreSnapshotFilename, kIndexSnapshotFilename, kWriteAheadLogFilename)),
       shutdown_(false),
       removed_(false)
 {

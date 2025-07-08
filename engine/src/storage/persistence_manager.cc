@@ -174,7 +174,7 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
     return std::move(loaded_store);
 }
 
-void VectorPersistenceManager::AppendInsert(Id id, const Vector& vector) const {
+void VectorPersistenceManager::AppendInsert(Id id, const Vector& vector) {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
     wal_out_ << "insert " << id;
     for (float value : vector) {
@@ -184,13 +184,13 @@ void VectorPersistenceManager::AppendInsert(Id id, const Vector& vector) const {
     wal_out_.flush();
 }
 
-void VectorPersistenceManager::AppendRemove(Id id) const {
+void VectorPersistenceManager::AppendRemove(Id id) {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
     wal_out_ << "remove " << id << "\n";
     wal_out_.flush();
 }
 
-void VectorPersistenceManager::ReplayWAL(VectorStore& store) const {
+void VectorPersistenceManager::ReplayWAL(VectorStore& store) {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
 
     std::ifstream wal_in(wal_file_path_);
@@ -221,7 +221,7 @@ void VectorPersistenceManager::ReplayWAL(VectorStore& store) const {
     std::cout << "write-ahead log replay completed" << std::endl;
 }
 
-void VectorPersistenceManager::ClearWAL() const {
+void VectorPersistenceManager::ClearWAL() {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
     std::ofstream clear_log(wal_file_path_, std::ios::trunc);
     std::cout << "write-ahead log cleared" << std::endl;
