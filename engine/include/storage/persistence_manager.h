@@ -32,6 +32,7 @@ private:
     std::string index_snapshot_file_path_;
 
     std::string wal_file_path_;
+    std::ofstream wal_out_;
     std::mutex wal_log_mutex_;
 };
 

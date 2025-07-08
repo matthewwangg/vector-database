@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "hnsw_index.h"
@@ -11,10 +12,16 @@
 
 namespace vector_db_engine {
 
-VectorPersistenceManager::VectorPersistenceManager(std::string store_snapshot_file_path, std::string index_snapshot_file_path)
+VectorPersistenceManager::VectorPersistenceManager(std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path)
     : store_snapshot_file_path_(store_snapshot_file_path),
-      index_snapshot_file_path_(index_snapshot_file_path)
-{}
+      index_snapshot_file_path_(index_snapshot_file_path),
+      wal_file_path_(wal_file_path)
+{
+    wal_out_.open(wal_file_path_, std::ios::app);
+    if (!wal_out_) {
+        std::cout << "failed to open write-ahead log" << std::endl;
+    }
+}
 
 void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
     vector_db::StoreSnapshot store_snapshot;
@@ -168,18 +175,55 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
 }
 
 void VectorPersistenceManager::AppendInsert(Id id, const Vector& vector) const {
-
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+    wal_out_ << "insert " << id;
+    for (float value : vector) {
+        wal_out_ << " " << value;
+    }
+    wal_out_ << "\n";
+    wal_out_.flush();
 }
 
 void VectorPersistenceManager::AppendRemove(Id id) const {
-
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+    wal_out_ << "remove " << id << "\n";
+    wal_out_.flush();
 }
-void VectorPersistenceManager::ReplayWAL(VectorStore& store) const {
 
+void VectorPersistenceManager::ReplayWAL(VectorStore& store) const {
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+
+    std::ifstream wal_in(wal_file_path_);
+    if (!wal_in) {
+        return;
+    }
+
+    std::string line;
+    while (std::getline(wal_in, line)) {
+        std::istringstream stream(line);
+        std::string command;
+        stream >> command;
+
+        Id id;
+        stream >> id;
+        if (command == "insert") {
+            Vector vector;
+            float value;
+            while (stream >> value)  {
+                vector.push_back(value);
+            }
+            store.Insert(id, vector);
+        }
+        if (command == "remove") {
+            store.Remove(id);
+        }
+    }
+    std::cout << "write-ahead log replay completed" << std::endl;
 }
 
 void VectorPersistenceManager::ClearWAL() const {
-
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+    std::ofstream clear_log(wal_file_path_, std::ios::trunc);
 }
 
 } // namespace vector_db_engine
