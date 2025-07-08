@@ -167,4 +167,19 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
     return std::move(loaded_store);
 }
 
+void VectorPersistenceManager::AppendInsert(Id id, const Vector& vector) const {
+
+}
+
+void VectorPersistenceManager::AppendRemove(Id id) const {
+
+}
+void VectorPersistenceManager::ReplayWAL(VectorStore& store) const {
+
+}
+
+void VectorPersistenceManager::ClearWAL() const {
+
+}
+
 } // namespace vector_db_engine
