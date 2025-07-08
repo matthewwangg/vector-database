@@ -113,4 +113,8 @@ void Engine::Cleanup() {
     stats_.deleted_count = 0;
 }
 
+bool Engine::Reindex() {
+    return store_->Reindex();
+}
+
 } // namespace vector_db_engine

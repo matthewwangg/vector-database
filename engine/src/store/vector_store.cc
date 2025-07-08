@@ -69,4 +69,9 @@ void VectorStore::Cleanup() {
     index_->Cleanup();
 }
 
+bool VectorStore::Reindex() {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    return index_->Reindex();
+}
+
 } // namespace vector_db_engine

@@ -263,6 +263,11 @@ void HNSWIndex::Cleanup() {
     }
 }
 
+bool HNSWIndex::Reindex() {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    return false;
+}
+
 float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {
     if (a.size() != b.size()) {
         return std::numeric_limits<float>::infinity();

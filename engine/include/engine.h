@@ -32,6 +32,7 @@ public:
 
     void BackgroundCleanupLoop();
     void Cleanup();
+    bool Reindex();
 
 private:
     std::unique_ptr<VectorStore> store_;
