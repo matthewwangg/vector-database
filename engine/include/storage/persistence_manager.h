@@ -22,7 +22,7 @@ public:
     void SaveSnapshot(const VectorStore& store) const;
     std::unique_ptr<VectorStore> LoadSnapshot() const;
 
-    void AppendInsert(Id id, const Vector& vector);
+    void AppendInsert(Id id, const Vector& vector, const std::string& content);
     void AppendRemove(Id id);
     void ReplayWAL(VectorStore& store);
     void ClearWAL();

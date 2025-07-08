@@ -174,12 +174,13 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
     return std::move(loaded_store);
 }
 
-void VectorPersistenceManager::AppendInsert(Id id, const Vector& vector) {
+void VectorPersistenceManager::AppendInsert(Id id, const Vector& vector, const std::string& content) {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
     wal_out_ << "insert " << id;
     for (float value : vector) {
         wal_out_ << " " << value;
     }
+    wal_out_ << " | " << content;
     wal_out_ << "\n";
     wal_out_.flush();
 }
@@ -212,7 +213,13 @@ void VectorPersistenceManager::ReplayWAL(VectorStore& store) {
             while (stream >> value)  {
                 vector.push_back(value);
             }
-            store.Insert(id, vector);
+
+            stream.clear();
+            stream >> std::ws;
+
+            std::string content;
+            std::getline(stream, content);
+            store.Insert(id, vector, content);
         }
         if (command == "remove") {
             store.Remove(id);

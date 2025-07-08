@@ -51,7 +51,7 @@ bool Engine::Insert(Id id, const Vector& vector, const std::string& content) {
         return false;
     }
 
-    persistence_manager_->AppendInsert(id, vector);
+    persistence_manager_->AppendInsert(id, vector, content);
 
     bool ok = store_->Insert(id, vector, content);
     if (ok) {
