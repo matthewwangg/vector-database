@@ -28,6 +28,8 @@ public:
     void ClearWAL();
 
 private:
+    std::string GetFullFilepath(std::string file_path);
+
     std::string store_snapshot_file_path_;
     std::string index_snapshot_file_path_;
 

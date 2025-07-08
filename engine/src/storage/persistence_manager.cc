@@ -1,5 +1,6 @@
 #include "persistence_manager.h"
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -14,9 +15,9 @@
 namespace vector_db_engine {
 
 VectorPersistenceManager::VectorPersistenceManager(std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path)
-    : store_snapshot_file_path_(store_snapshot_file_path),
-      index_snapshot_file_path_(index_snapshot_file_path),
-      wal_file_path_(wal_file_path)
+    : store_snapshot_file_path_(GetFullFilepath(store_snapshot_file_path)),
+      index_snapshot_file_path_(GetFullFilepath(index_snapshot_file_path)),
+      wal_file_path_(GetFullFilepath(wal_file_path))
 {
     wal_out_.open(wal_file_path_, std::ios::app);
     if (!wal_out_) {
@@ -256,6 +257,17 @@ void VectorPersistenceManager::ClearWAL() {
     }
 
     std::cout << "write-ahead log cleared" << std::endl;
+}
+
+std::string VectorPersistenceManager::GetFullFilepath(std::string file_path) {
+    const char* home = std::getenv("HOME");
+    if (!home) {
+        return file_path;
+    }
+
+    std::filesystem::create_directories(std::filesystem::path(home) / ".vector_db");
+
+    return std::string(home) + "/.vector_db/" + file_path;
 }
 
 } // namespace vector_db_engine
