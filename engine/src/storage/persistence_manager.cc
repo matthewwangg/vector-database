@@ -224,6 +224,7 @@ void VectorPersistenceManager::ReplayWAL(VectorStore& store) const {
 void VectorPersistenceManager::ClearWAL() const {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
     std::ofstream clear_log(wal_file_path_, std::ios::trunc);
+    std::cout << "write-ahead log cleared" << std::endl;
 }
 
 } // namespace vector_db_engine
