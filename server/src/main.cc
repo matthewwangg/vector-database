@@ -32,10 +32,17 @@ int main(int argc, char* argv[]) {
     std::signal(SIGTERM, HandleSignals);
 
     std::string server_address = "0.0.0.0:50051";
-    int vector_dimensionality = 384;
 
-    auto index = std::make_unique<vector_db_engine::HNSWIndex>(16, 32, 128, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, vector_dimensionality);
-    auto engine = std::make_unique<vector_db_engine::Engine>(std::move(index), vector_dimensionality, 0.25);
+    std::size_t m = 16;
+    std::size_t m0 = 32;
+    std::size_t ef_construction = 64;
+    float ml = 1.0f;
+    int vector_dimensionality = 384;
+    auto distance_metric = vector_db_engine::HNSWIndex::DistanceMetric::L2;
+    float reindex_threshold = 0.25;
+
+    auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality);
+    auto engine = std::make_unique<vector_db_engine::Engine>(std::move(hnsw_index), vector_dimensionality, reindex_threshold);
 
     VectorDatabaseServiceImpl vector_db_service(std::move(engine));
 
