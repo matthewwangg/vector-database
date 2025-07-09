@@ -19,6 +19,9 @@ public:
     struct Stats {
         uint64_t vector_count = 0;
         uint64_t deleted_count = 0;
+
+        uint64_t vector_count_at_last_reindex = 0;
+        uint64_t stale_count = 0;
     };
 
     explicit Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality, float reindex_threshold);
