@@ -29,8 +29,7 @@ public:
     bool Remove(Id id);
     std::vector<Data> Search(const Vector& query, std::size_t k, std::size_t search_param) const;
 
-    void Cleanup();
-    bool Reindex();
+    void Cleanup(bool reindex);
 
     const std::unordered_map<Id, Data>& GetStore() const { return store_; }
     const VectorIndex* GetIndex() const { return index_.get(); }

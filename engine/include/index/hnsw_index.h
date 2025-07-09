@@ -36,7 +36,7 @@ public:
     std::vector<Id> Search(const Vector& query, std::size_t k, std::size_t ef_search) const override;
 
     void Cleanup() override;
-    bool Reindex() override;
+    void Reindex() override;
 
     const std::unordered_map<Id, Node>& GetNodes() const { return nodes_; }
     const std::unordered_map<int, std::unordered_set<Id>>& GetNodeLevels() const { return node_levels_; }

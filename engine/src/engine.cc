@@ -41,7 +41,7 @@ Engine::~Engine() {
     if (cleanup_thread_.joinable()) {
         cleanup_thread_.join();
     }
-    Cleanup();
+    Cleanup(true);
     persistence_manager_->SaveSnapshot(*store_);
     persistence_manager_->ClearWAL();
 }
@@ -84,6 +84,10 @@ std::vector<VectorStore::Data> Engine::Search(const Vector& query, std::size_t k
 }
 
 Engine::Stats Engine::GetStats() const {
+    if (shutdown_) {
+        return {};
+    }
+
     return stats_;
 }
 
@@ -98,7 +102,7 @@ void Engine::BackgroundCleanupLoop() {
 
         if (removed_) {
             auto start = std::chrono::steady_clock::now();
-            Cleanup();
+            Cleanup(false);
             auto end = std::chrono::steady_clock::now();
             auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
             std::cout << "cleanup completed in " << duration_ms << " ms\n";
@@ -106,15 +110,18 @@ void Engine::BackgroundCleanupLoop() {
     }
 }
 
-void Engine::Cleanup() {
-    store_->Cleanup();
+void Engine::Cleanup(bool force) {
+    if (shutdown_ && !force) {
+        return;
+    }
+
+    float ratio = static_cast<float>(stats_.deleted_count) / static_cast<float>(stats_.vector_count);
+    bool reindex = ratio > 0.1;
+    store_->Cleanup(reindex);
+
     removed_ = false;
     stats_.vector_count = stats_.vector_count - stats_.deleted_count;
     stats_.deleted_count = 0;
-}
-
-bool Engine::Reindex() {
-    return store_->Reindex();
 }
 
 } // namespace vector_db_engine

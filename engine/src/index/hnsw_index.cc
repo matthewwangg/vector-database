@@ -263,9 +263,24 @@ void HNSWIndex::Cleanup() {
     }
 }
 
-bool HNSWIndex::Reindex() {
+void HNSWIndex::Reindex() {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
-    return false;
+
+    std::vector<std::pair<Id, Vector>> active_vectors;
+    active_vectors.reserve(nodes_.size());
+
+    for (const auto& [id, node] : nodes_) {
+        active_vectors.emplace_back(id, node.vector);
+    }
+
+    nodes_.clear();
+    node_levels_.clear();
+    entry_point_.reset();
+    max_level_ = -1;
+
+    for (const auto& [id, vector] : active_vectors) {
+        Insert(id, vector);
+    }
 }
 
 float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {

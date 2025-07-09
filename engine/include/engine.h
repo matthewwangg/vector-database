@@ -31,8 +31,7 @@ public:
     Stats GetStats() const;
 
     void BackgroundCleanupLoop();
-    void Cleanup();
-    bool Reindex();
+    void Cleanup(bool force);
 
 private:
     std::unique_ptr<VectorStore> store_;
