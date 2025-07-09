@@ -7,6 +7,7 @@ service VectorDatabase {
   rpc Remove(RemoveRequest) returns (RemoveResponse);
   rpc Search(SearchRequest) returns (SearchResponse);
   rpc Stats(StatsRequest) returns (StatsResponse);
+  rpc Metrics(MetricsRequest) returns (MetricsResponse);
 
   rpc HealthCheck(Empty) returns (Status);
 }
@@ -56,4 +57,16 @@ message StatsResponse {
   uint64 vector_count = 1;
   uint64 deleted_count = 2;
   uint64 stale_count = 3;
+}
+
+message MetricsRequest {}
+
+message MetricsResponse {
+  uint64 insert_count = 1;
+  uint64 remove_count = 2;
+  uint64 search_count = 3;
+  uint64 cleanup_count = 4;
+  uint64 reindex_count = 5;
+
+  uint64 average_search_latency_ms = 6;
 }
