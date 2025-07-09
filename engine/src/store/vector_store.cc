@@ -4,6 +4,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
+#include <vector>
 
 namespace vector_db_engine {
 
@@ -64,9 +65,13 @@ std::vector<VectorStore::Data> VectorStore::Search(const Vector& query, std::siz
     return results;
 }
 
-void VectorStore::Cleanup() {
+void VectorStore::Cleanup(bool reindex) {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     index_->Cleanup();
+
+    if (reindex) {
+        index_->Reindex();
+    }
 }
 
 } // namespace vector_db_engine

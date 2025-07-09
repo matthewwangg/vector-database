@@ -17,9 +17,10 @@ inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
 inline const std::string kWriteAheadLogFilename = "wal.log";
 
-Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
+Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality, float reindex_threshold)
     : store_(std::make_unique<VectorStore>(std::move(index), vector_dimensionality)),
       persistence_manager_(std::make_unique<VectorPersistenceManager>(kStoreSnapshotFilename, kIndexSnapshotFilename, kWriteAheadLogFilename)),
+      reindex_threshold_(reindex_threshold),
       shutdown_(false),
       removed_(false)
 {
@@ -41,7 +42,7 @@ Engine::~Engine() {
     if (cleanup_thread_.joinable()) {
         cleanup_thread_.join();
     }
-    Cleanup();
+    Cleanup(true);
     persistence_manager_->SaveSnapshot(*store_);
     persistence_manager_->ClearWAL();
 }
@@ -71,6 +72,7 @@ bool Engine::Remove(Id id) {
     if (ok) {
         removed_ = true;
         stats_.deleted_count++;
+        stats_.stale_count++;
     }
     return ok;
 }
@@ -84,6 +86,10 @@ std::vector<VectorStore::Data> Engine::Search(const Vector& query, std::size_t k
 }
 
 Engine::Stats Engine::GetStats() const {
+    if (shutdown_) {
+        return {};
+    }
+
     return stats_;
 }
 
@@ -98,7 +104,7 @@ void Engine::BackgroundCleanupLoop() {
 
         if (removed_) {
             auto start = std::chrono::steady_clock::now();
-            Cleanup();
+            Cleanup(false);
             auto end = std::chrono::steady_clock::now();
             auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
             std::cout << "cleanup completed in " << duration_ms << " ms\n";
@@ -106,11 +112,26 @@ void Engine::BackgroundCleanupLoop() {
     }
 }
 
-void Engine::Cleanup() {
-    store_->Cleanup();
+void Engine::Cleanup(bool force) {
+    if (shutdown_ && !force) {
+        return;
+    }
+
+    if (stats_.vector_count_at_last_reindex == 0) {
+        return;
+    }
+    float ratio = static_cast<float>(stats_.stale_count) / static_cast<float>(stats_.vector_count_at_last_reindex);
+    bool reindex = ratio > reindex_threshold;
+
+    store_->Cleanup(reindex);
+
     removed_ = false;
     stats_.vector_count = stats_.vector_count - stats_.deleted_count;
     stats_.deleted_count = 0;
+    if (reindex) {
+        stats_.vector_count_at_last_reindex = stats_.vector_count;
+        stats_.stale_count = 0;
+    }
 }
 
 } // namespace vector_db_engine

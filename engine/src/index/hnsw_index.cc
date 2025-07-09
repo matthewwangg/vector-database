@@ -263,6 +263,70 @@ void HNSWIndex::Cleanup() {
     }
 }
 
+void HNSWIndex::Reindex() {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+
+    std::vector<std::pair<Id, Vector>> active_vectors;
+    active_vectors.reserve(nodes_.size());
+
+    for (const auto& [id, node] : nodes_) {
+        active_vectors.emplace_back(id, node.vector);
+    }
+
+    nodes_.clear();
+    node_levels_.clear();
+    entry_point_.reset();
+    max_level_ = -1;
+
+    for (const auto& [id, vector] : active_vectors) {
+        InsertNoLock(id, vector);
+    }
+}
+
+void HNSWIndex::InsertNoLock(Id id, const Vector& vector) {
+    if (vector.size() != vector_dimensionality_ || nodes_.contains(id)) {
+        return;
+    }
+
+    int new_level = GetRandomLevel();
+
+    nodes_[id] = Node{
+            .vector = vector,
+            .level = new_level,
+            .neighbors = {},
+            .active = true
+    };
+    node_levels_[new_level].insert(id);
+
+    if (!entry_point_.has_value()) {
+        entry_point_ = id;
+        max_level_ = new_level;
+        return;
+    }
+
+    Id entry_point = entry_point_.value();
+
+    for (int l = max_level_; l > new_level; --l) {
+        std::vector<Id> nearest = SearchLevel(vector, entry_point, 1, l);
+        if (nearest.empty()) {
+            continue;
+        }
+        entry_point = nearest[0];
+    }
+
+    for (int l = std::min(max_level_, new_level); l > -1; --l) {
+        std::vector<Id> nearest = SearchLevel(vector, entry_point, ef_construction_, l);
+        std::vector<Id> neighbors = SelectNeighbors(vector, nearest, l);
+
+        ConnectNeighbors(id, vector, neighbors, l);
+    }
+
+    if (new_level > max_level_) {
+        max_level_ = new_level;
+        entry_point_ = id;
+    }
+}
+
 float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {
     if (a.size() != b.size()) {
         return std::numeric_limits<float>::infinity();

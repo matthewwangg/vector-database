@@ -18,6 +18,7 @@ public:
     virtual std::vector<Id> Search(const Vector& query, std::size_t k, std::size_t search_param) const = 0;
 
     virtual void Cleanup() = 0;
+    virtual void Reindex() = 0;
 };
 
 } // namespace vector_db_engine
