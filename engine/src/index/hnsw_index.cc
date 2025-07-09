@@ -279,7 +279,51 @@ void HNSWIndex::Reindex() {
     max_level_ = -1;
 
     for (const auto& [id, vector] : active_vectors) {
-        Insert(id, vector);
+        InsertNoLock(id, vector);
+    }
+}
+
+void HNSWIndex::InsertNoLock(Id id, const Vector& vector) {
+    if (vector.size() != vector_dimensionality_ || nodes_.contains(id)) {
+        return;
+    }
+
+    int new_level = GetRandomLevel();
+
+    nodes_[id] = Node{
+            .vector = vector,
+            .level = new_level,
+            .neighbors = {},
+            .active = true
+    };
+    node_levels_[new_level].insert(id);
+
+    if (!entry_point_.has_value()) {
+        entry_point_ = id;
+        max_level_ = new_level;
+        return;
+    }
+
+    Id entry_point = entry_point_.value();
+
+    for (int l = max_level_; l > new_level; --l) {
+        std::vector<Id> nearest = SearchLevel(vector, entry_point, 1, l);
+        if (nearest.empty()) {
+            continue;
+        }
+        entry_point = nearest[0];
+    }
+
+    for (int l = std::min(max_level_, new_level); l > -1; --l) {
+        std::vector<Id> nearest = SearchLevel(vector, entry_point, ef_construction_, l);
+        std::vector<Id> neighbors = SelectNeighbors(vector, nearest, l);
+
+        ConnectNeighbors(id, vector, neighbors, l);
+    }
+
+    if (new_level > max_level_) {
+        max_level_ = new_level;
+        entry_point_ = id;
     }
 }
 

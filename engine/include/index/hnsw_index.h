@@ -55,6 +55,8 @@ private:
     std::vector<Id> SearchLevel(const Vector& query, std::optional<Id> entry_point, std::size_t ef, int level) const;
     std::vector<Id> SelectNeighbors(const Vector& query, const std::vector<Id>& candidates, int level) const;
 
+    void InsertNoLock(Id id, const Vector& vector);
+
     float ComputeDistance(const Vector& a, const Vector& b) const;
     void ConnectNeighbors(Id node_id, const Vector& vector, const std::vector<Id>& neighbors, int level);
     int GetRandomLevel() const;
