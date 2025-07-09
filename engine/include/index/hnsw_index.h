@@ -81,6 +81,6 @@ private:
     mutable std::shared_mutex rw_mutex_;
 };
 
-} // vector_db_engine
+} // namespace vector_db_engine
 
 #endif //VECTOR_DATABASE_HNSW_INDEX_H

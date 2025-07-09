@@ -49,6 +49,6 @@ private:
     std::mutex cleanup_mutex_;
 };
 
-}
+} // namespace vector_db_engine
 
 #endif //VECTOR_DATABASE_ENGINE_H
