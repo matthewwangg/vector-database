@@ -55,4 +55,5 @@ message StatsRequest {}
 message StatsResponse {
   uint64 vector_count = 1;
   uint64 deleted_count = 2;
+  uint64 stale_count = 3;
 }

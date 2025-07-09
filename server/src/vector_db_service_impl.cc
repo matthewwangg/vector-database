@@ -51,6 +51,7 @@ grpc::Status VectorDatabaseServiceImpl::Stats(grpc::ServerContext* context, cons
 
     response->set_vector_count(stats.vector_count);
     response->set_deleted_count(stats.deleted_count);
+    response->set_stale_count(stats.stale_count);
 
     return grpc::Status::OK;
 }
