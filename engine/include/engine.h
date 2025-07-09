@@ -22,6 +22,16 @@ public:
         uint64_t stale_count = 0;
     };
 
+    struct Metrics {
+        uint64_t insert_count = 0;
+        uint64_t remove_count = 0;
+        uint64_t search_count = 0;
+        uint64_t cleanup_count = 0;
+        uint64_t reindex_count = 0;
+
+        uint64_t average_search_latency_ms = 0;
+    };
+
     explicit Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality, float reindex_threshold);
     ~Engine();
 
@@ -39,6 +49,7 @@ private:
     std::unique_ptr<VectorPersistenceManager> persistence_manager_;
 
     Stats stats_;
+    Metrics metrics_;
 
     float reindex_threshold_;
 
