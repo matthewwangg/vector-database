@@ -93,6 +93,14 @@ Engine::Stats Engine::GetStats() const {
     return stats_;
 }
 
+Engine::Metrics Engine::GetMetrics const {
+    if (shutdown_) {
+        return {};
+    }
+
+    return metrics_;
+};
+
 void Engine::BackgroundCleanupLoop() {
     std::unique_lock<std::mutex> lock(cleanup_mutex_);
     while (!shutdown_) {

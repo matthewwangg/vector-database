@@ -40,6 +40,7 @@ public:
     std::vector<VectorStore::Data> Search(const Vector& query, std::size_t k, std::size_t search_param) const;
 
     Stats GetStats() const;
+    Metrics GetMetrics() const;
 
     void BackgroundCleanupLoop();
     void Cleanup(bool force);

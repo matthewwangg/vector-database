@@ -57,6 +57,15 @@ grpc::Status VectorDatabaseServiceImpl::Stats(grpc::ServerContext* context, cons
 }
 
 grpc::Status VectorDatabaseServiceImpl::Metrics(grpc::ServerContext* context, const vector_db::MetricsRequest* request, vector_db::MetricsResponse* response) {
+    vector_db_engine::Engine::Metrics metrics = engine_->GetMetrics();
+
+    response->set_insert_count(metrics.insert_count);
+    response->set_remove_count(metrics.remove_count);
+    response->set_search_count(metrics.search_count);
+    response->set_cleanup_count(metrics.cleanup_count);
+    response->set_reindex_count(metrics.reindex_count);
+    response->set_average_search_latency_ms(metrics.average_search_latency_ms);
+
     return grpc::Status::OK;
 }
 
