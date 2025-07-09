@@ -57,6 +57,7 @@ bool Engine::Insert(Id id, const Vector& vector, const std::string& content) {
     bool ok = store_->Insert(id, vector, content);
     if (ok) {
         stats_.vector_count++;
+        metrics_.insert_count++;
     }
     return ok;
 }
@@ -73,16 +74,24 @@ bool Engine::Remove(Id id) {
         removed_ = true;
         stats_.deleted_count++;
         stats_.stale_count++;
+        metrics_.remove_count++;
     }
     return ok;
 }
 
-std::vector<VectorStore::Data> Engine::Search(const Vector& query, std::size_t k, std::size_t search_param) const {
+std::vector<VectorStore::Data> Engine::Search(const Vector& query, std::size_t k, std::size_t search_param) {
     if (shutdown_) {
         return {};
     }
 
-    return store_->Search(query, k, search_param);
+    auto start = std::chrono::steady_clock::now();
+    std::vector<VectorStore::Data> data = store_->Search(query, k, search_param);
+    auto end = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    metrics_.average_search_latency_ms = (metrics_.average_search_latency_ms * metrics_.search_count + duration) / (metrics_.search_count + 1);
+    metrics_.search_count++;
+
+    return data;
 }
 
 Engine::Stats Engine::GetStats() const {
@@ -93,7 +102,7 @@ Engine::Stats Engine::GetStats() const {
     return stats_;
 }
 
-Engine::Metrics Engine::GetMetrics const {
+Engine::Metrics Engine::GetMetrics() const {
     if (shutdown_) {
         return {};
     }
@@ -132,12 +141,14 @@ void Engine::Cleanup(bool force) {
     bool reindex = ratio > reindex_threshold_;
 
     store_->Cleanup(reindex);
+    metrics_.cleanup_count++;
 
     removed_ = false;
     stats_.vector_count = stats_.vector_count - stats_.deleted_count;
     stats_.deleted_count = 0;
 
     if (reindex) {
+        metrics_.reindex_count++;
         stats_.stale_count = 0;
     }
 }

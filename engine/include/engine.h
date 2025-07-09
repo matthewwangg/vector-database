@@ -37,7 +37,7 @@ public:
 
     bool Insert(Id id, const Vector& vector, const std::string& content);
     bool Remove(Id id);
-    std::vector<VectorStore::Data> Search(const Vector& query, std::size_t k, std::size_t search_param) const;
+    std::vector<VectorStore::Data> Search(const Vector& query, std::size_t k, std::size_t search_param);
 
     Stats GetStats() const;
     Metrics GetMetrics() const;
