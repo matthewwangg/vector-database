@@ -117,19 +117,19 @@ void Engine::Cleanup(bool force) {
         return;
     }
 
-    if (stats_.vector_count_at_last_reindex == 0) {
-        return;
+    float ratio = 0;
+    if (stats_.vector_count + stats_.stale_count - stats_.deleted_count > 0) {
+        ratio = static_cast<float>(stats_.stale_count) / static_cast<float>(stats_.vector_count + stats_.stale_count - stats_.deleted_count);
     }
-    float ratio = static_cast<float>(stats_.stale_count) / static_cast<float>(stats_.vector_count_at_last_reindex);
-    bool reindex = ratio > reindex_threshold;
+    bool reindex = ratio > reindex_threshold_;
 
     store_->Cleanup(reindex);
 
     removed_ = false;
     stats_.vector_count = stats_.vector_count - stats_.deleted_count;
     stats_.deleted_count = 0;
+
     if (reindex) {
-        stats_.vector_count_at_last_reindex = stats_.vector_count;
         stats_.stale_count = 0;
     }
 }
