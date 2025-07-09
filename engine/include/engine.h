@@ -21,7 +21,7 @@ public:
         uint64_t deleted_count = 0;
     };
 
-    explicit Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality);
+    explicit Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality, float reindex_threshold);
     ~Engine();
 
     bool Insert(Id id, const Vector& vector, const std::string& content);
@@ -38,6 +38,8 @@ private:
     std::unique_ptr<VectorPersistenceManager> persistence_manager_;
 
     Stats stats_;
+
+    float reindex_threshold_;
 
     std::thread cleanup_thread_;
     std::atomic<bool> shutdown_;

@@ -17,9 +17,10 @@ inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
 inline const std::string kWriteAheadLogFilename = "wal.log";
 
-Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality)
+Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality, float reindex_threshold)
     : store_(std::make_unique<VectorStore>(std::move(index), vector_dimensionality)),
       persistence_manager_(std::make_unique<VectorPersistenceManager>(kStoreSnapshotFilename, kIndexSnapshotFilename, kWriteAheadLogFilename)),
+      reindex_threshold_(reindex_threshold),
       shutdown_(false),
       removed_(false)
 {
@@ -116,7 +117,7 @@ void Engine::Cleanup(bool force) {
     }
 
     float ratio = static_cast<float>(stats_.deleted_count) / static_cast<float>(stats_.vector_count);
-    bool reindex = ratio > 0.1;
+    bool reindex = ratio > reindex_threshold;
     store_->Cleanup(reindex);
 
     removed_ = false;
