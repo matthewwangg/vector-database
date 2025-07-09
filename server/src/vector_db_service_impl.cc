@@ -56,6 +56,10 @@ grpc::Status VectorDatabaseServiceImpl::Stats(grpc::ServerContext* context, cons
     return grpc::Status::OK;
 }
 
+grpc::Status VectorDatabaseServiceImpl::Metrics(grpc::ServerContext* context, const vector_db::MetricsRequest* request, vector_db::MetricsResponse* response) {
+    return grpc::Status::OK;
+}
+
 grpc::Status VectorDatabaseServiceImpl::HealthCheck(grpc::ServerContext* context, const vector_db::Empty* request, vector_db::Status* response) {
     response->set_successful(true);
     response->set_message("Healthy!");
