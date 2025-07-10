@@ -17,6 +17,8 @@ message InsertRequest {
   uint64 id = 1;
   repeated float vector = 2;
   string content = 3;
+
+  string table = 4;
 }
 
 message InsertResponse {
@@ -25,6 +27,8 @@ message InsertResponse {
 
 message RemoveRequest{
   uint64 id = 1;
+
+  string table = 4;
 }
 
 message RemoveResponse {
@@ -35,6 +39,8 @@ message SearchRequest {
   repeated float query = 1;
   uint32 k = 2;
   uint32 search_parameter = 3;
+
+  string table = 4;
 }
 
 message SearchResponse {
@@ -58,6 +64,8 @@ message StatsResponse {
   uint64 vector_count = 1;
   uint64 deleted_count = 2;
   uint64 stale_count = 3;
+
+  string table = 4;
 }
 
 message MetricsRequest {}
@@ -70,6 +78,8 @@ message MetricsResponse {
   uint64 reindex_count = 5;
 
   uint64 average_search_latency_ms = 6;
+
+  string table = 7;
 }
 
 message CreateTableRequest {
