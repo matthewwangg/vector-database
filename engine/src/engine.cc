@@ -110,6 +110,36 @@ Engine::Metrics Engine::GetMetrics() const {
     return metrics_;
 };
 
+bool Engine::CreateTable(std::string name) {
+    std::unique_lock lock(engine_mutex_);
+
+    if (store_map_.contains(name) || persistence_manager_map_.contains(name)) {
+        return false;
+    }
+
+    std::size_t m = 16;
+    std::size_t m0 = 32;
+    std::size_t ef_construction = 64;
+    float ml = 1.0f;
+    int vector_dimensionality = 384;
+    auto distance_metric = vector_db_engine::HNSWIndex::DistanceMetric::L2;
+
+    std::string store_snapshot = name + "_" + kStoreSnapshotFilename;
+    std::string index_snapshot = name + "_" + kIndexSnapshotFilename;
+    std::string write_ahead_log = name + "_" + kWriteAheadLogFilename;
+
+    auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality);
+    auto vector_store = std::make_unique<VectorStore>(std::move(hnsw_index), vector_dimensionality);
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>(store_snapshot, index_snapshot, write_ahead_log);
+
+    store_map_[name] = std::move(vector_store);
+    persistence_manager_map[name] = std::move(persistence_manager);
+    stats_map_[name] = {};
+    metrics_map_[name] = {};
+
+    return true;
+}
+
 void Engine::BackgroundCleanupLoop() {
     std::unique_lock<std::mutex> lock(cleanup_mutex_);
     while (!shutdown_) {

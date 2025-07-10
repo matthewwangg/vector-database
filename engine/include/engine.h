@@ -5,8 +5,10 @@
 #include <condition_variable>
 #include <cstdint>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include "persistence_manager.h"
@@ -42,15 +44,23 @@ public:
     Stats GetStats() const;
     Metrics GetMetrics() const;
 
+    bool CreateTable(std::string name);
+
     void BackgroundCleanupLoop();
     void Cleanup(bool force);
 
 private:
     std::unique_ptr<VectorStore> store_;
     std::unique_ptr<VectorPersistenceManager> persistence_manager_;
-
     Stats stats_;
     Metrics metrics_;
+
+    std::unordered_map<std::string, std::unique_ptr<VectorStore>> store_map_;
+    std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>> persistence_manager_map_;
+    std::unordered_map<std::string, Stats> stats_map_;
+    std::unordered_map<std::string, Metrics> metrics_map_;
+
+    mutable std::shared_mutex engine_mutex_;
 
     float reindex_threshold_;
 
