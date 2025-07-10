@@ -8,6 +8,7 @@ service VectorDatabase {
   rpc Search(SearchRequest) returns (SearchResponse);
   rpc Stats(StatsRequest) returns (StatsResponse);
   rpc Metrics(MetricsRequest) returns (MetricsResponse);
+  rpc CreateTable(CreateTableRequest) returns (CreateTableResponse);
 
   rpc HealthCheck(Empty) returns (Status);
 }
@@ -69,4 +70,12 @@ message MetricsResponse {
   uint64 reindex_count = 5;
 
   uint64 average_search_latency_ms = 6;
+}
+
+message CreateTableRequest {
+  string name = 1;
+}
+
+message CreateTableResponse {
+  bool successful = 1;
 }
