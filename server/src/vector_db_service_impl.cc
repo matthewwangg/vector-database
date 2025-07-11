@@ -46,6 +46,24 @@ grpc::Status VectorDatabaseServiceImpl::Search(grpc::ServerContext* context, con
     return grpc::Status::OK;
 }
 
+grpc::Status VectorDatabaseServiceImpl::BatchInsert(grpc::ServerContext* context, const vector_db::BatchInsertRequest* request, vector_db::BatchInsertResponse* response) {
+    
+
+    return grpc::Status::OK;
+}
+
+grpc::Status VectorDatabaseServiceImpl::BatchRemove(grpc::ServerContext* context, const vector_db::BatchRemoveRequest* request, vector_db::BatchRemoveResponse* response) {
+
+
+    return grpc::Status::OK;
+}
+
+grpc::Status VectorDatabaseServiceImpl::BatchSearch(grpc::ServerContext* context, const vector_db::BatchSearchRequest* request, vector_db::BatchSearchResponse* response) {
+
+
+    return grpc::Status::OK;
+}
+
 grpc::Status VectorDatabaseServiceImpl::Stats(grpc::ServerContext* context, const vector_db::StatsRequest* request, vector_db::StatsResponse* response) {
     vector_db_engine::Engine::Stats stats = engine_->GetStats(request->table());
 
