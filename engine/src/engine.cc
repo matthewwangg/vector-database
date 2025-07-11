@@ -47,70 +47,74 @@ Engine::~Engine() {
     persistence_manager_->ClearWAL();
 }
 
-bool Engine::Insert(Id id, const Vector& vector, const std::string& content) {
-    if (shutdown_) {
+bool Engine::Insert(std::string table_name, Id id, const Vector& vector, const std::string& content) {
+    if (shutdown_ || name.empty()) {
         return false;
     }
 
-    persistence_manager_->AppendInsert(id, vector, content);
+    persistence_manager_map_[table_name]->AppendInsert(id, vector, content);
 
-    bool ok = store_->Insert(id, vector, content);
+    bool ok = store_map_[table_name]->Insert(id, vector, content);
     if (ok) {
-        stats_.vector_count++;
-        metrics_.insert_count++;
+        stats_map_[table_name].vector_count++;
+        metrics_map_[table_name].insert_count++;
     }
     return ok;
 }
 
-bool Engine::Remove(Id id) {
-    if (shutdown_) {
+bool Engine::Remove(std::string table_name, Id id) {
+    if (shutdown_ || name.empty()) {
         return false;
     }
 
-    persistence_manager_->AppendRemove(id);
+    persistence_manager_map_[table_name]->AppendRemove(id);
 
-    bool ok = store_->Remove(id);
+    bool ok = store_map_[table_name]->Remove(id);
     if (ok) {
         removed_ = true;
-        stats_.deleted_count++;
-        stats_.stale_count++;
-        metrics_.remove_count++;
+        stats_map_[table_name].deleted_count++;
+        stats_map_[table_name].stale_count++;
+        metrics_map_[table_name].remove_count++;
     }
     return ok;
 }
 
-std::vector<VectorStore::Data> Engine::Search(const Vector& query, std::size_t k, std::size_t search_param) {
-    if (shutdown_) {
+std::vector<VectorStore::Data> Engine::Search(std::string table_name, const Vector& query, std::size_t k, std::size_t search_param) {
+    if (shutdown_ || name.empty()) {
         return {};
     }
 
     auto start = std::chrono::steady_clock::now();
-    std::vector<VectorStore::Data> data = store_->Search(query, k, search_param);
+    std::vector<VectorStore::Data> data = store_map_[table_name]->Search(query, k, search_param);
     auto end = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    metrics_.average_search_latency_ms = (metrics_.average_search_latency_ms * metrics_.search_count + duration) / (metrics_.search_count + 1);
-    metrics_.search_count++;
+    metrics_map_[table_name].average_search_latency_ms = (metrics_map_[table_name].average_search_latency_ms * metrics_map_[table_name].search_count + duration) / (metrics_map_[table_name].search_count + 1);
+    metrics_map_[table_name].search_count++;
 
     return data;
 }
 
-Engine::Stats Engine::GetStats() const {
-    if (shutdown_) {
+Engine::Stats Engine::GetStats(std::string table_name) const {
+    if (shutdown_ || name.empty()) {
         return {};
     }
 
-    return stats_;
+    return stats_map_[table_name];
 }
 
-Engine::Metrics Engine::GetMetrics() const {
-    if (shutdown_) {
+Engine::Metrics Engine::GetMetrics(std::string table_name) const {
+    if (shutdown_ || name.empty()) {
         return {};
     }
 
-    return metrics_;
+    return metrics_map_[table_name];
 };
 
 bool Engine::CreateTable(std::string name) {
+    if (shutdown_ || name.empty()) {
+        return false;
+    }
+
     std::unique_lock lock(engine_mutex_);
 
     if (store_map_.contains(name) || persistence_manager_map_.contains(name)) {
@@ -136,6 +140,7 @@ bool Engine::CreateTable(std::string name) {
     persistence_manager_map[name] = std::move(persistence_manager);
     stats_map_[name] = {};
     metrics_map_[name] = {};
+    removed_flag_map_[name] = false;
 
     return true;
 }
@@ -159,27 +164,27 @@ void Engine::BackgroundCleanupLoop() {
     }
 }
 
-void Engine::Cleanup(bool force) {
+void Engine::Cleanup(std::string table_name, bool force) {
     if (shutdown_ && !force) {
         return;
     }
 
     float ratio = 0;
-    if (stats_.vector_count + stats_.stale_count - stats_.deleted_count > 0) {
-        ratio = static_cast<float>(stats_.stale_count) / static_cast<float>(stats_.vector_count + stats_.stale_count - stats_.deleted_count);
+    if (stats_map_[table_name].vector_count + stats_map_[table_name].stale_count - stats_map_[table_name].deleted_count > 0) {
+        ratio = static_cast<float>(stats_map_[table_name].stale_count) / static_cast<float>(stats_map_[table_name].vector_count + stats_map_[table_name].stale_count - stats_map_[table_name].deleted_count);
     }
     bool reindex = ratio > reindex_threshold_;
 
-    store_->Cleanup(reindex);
-    metrics_.cleanup_count++;
+    store_map_[table_name]->Cleanup(reindex);
+    metrics_map_[table_name].cleanup_count++;
 
     removed_ = false;
-    stats_.vector_count = stats_.vector_count - stats_.deleted_count;
-    stats_.deleted_count = 0;
+    stats_map_[table_name].vector_count = stats_map_[table_name].vector_count - stats_map_[table_name].deleted_count;
+    stats_map_[table_name].deleted_count = 0;
 
     if (reindex) {
-        metrics_.reindex_count++;
-        stats_.stale_count = 0;
+        metrics_map_[table_name].reindex_count++;
+        stats_map_[table_name].stale_count = 0;
     }
 }
 
