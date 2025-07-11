@@ -25,7 +25,7 @@ Engine::Engine(float reindex_threshold)
 {
     std::vector<std::string> table_names = []() {
         std::vector<std::string> tables;
-        const std::string suffix = "_" + kStoreSnapshotFilename;
+        const std::string suffix = "_" + kWriteAheadLogFilename;
 
         const std::string base_directory = std::string(std::getenv("HOME")) + "/.vector_db";
         for (const auto& entry : std::filesystem::directory_iterator(base_directory)) {
