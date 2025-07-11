@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "hnsw_index.h"
 #include "vector_store.h"
 
 namespace vector_db_engine {
@@ -17,22 +18,29 @@ inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
 inline const std::string kWriteAheadLogFilename = "wal.log";
 
-Engine::Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality, float reindex_threshold)
-    : store_(std::make_unique<VectorStore>(std::move(index), vector_dimensionality)),
-      persistence_manager_(std::make_unique<VectorPersistenceManager>(kStoreSnapshotFilename, kIndexSnapshotFilename, kWriteAheadLogFilename)),
-      reindex_threshold_(reindex_threshold),
-      shutdown_(false),
-      removed_(false)
+Engine::Engine(float reindex_threshold)
+    : reindex_threshold_(reindex_threshold),
+      shutdown_(false)
 {
-    std::unique_ptr<VectorStore> loaded_store = persistence_manager_->LoadSnapshot();
-    if (loaded_store) {
-        persistence_manager_->ReplayWAL(*loaded_store);
-        store_ = std::move(loaded_store);
-    } else {
-        persistence_manager_->ReplayWAL(*store_);
+    std::vector<std::string> table_names = []() {
+        const std::string suffix = "_" + kStoreSnapshotFilename;
+        std::vector<std::string> tables;
+        return tables;
+    }();
+
+    for (const std::string& table : table_names) {
+        CreateTable(table);
+        std::unique_ptr<VectorStore> loaded_store = persistence_manager_map_[table]->LoadSnapshot();
+        if (loaded_store) {
+            persistence_manager_map_[table]->ReplayWAL(*loaded_store);
+            store_map_[table] = std::move(loaded_store);
+        } else {
+            persistence_manager_map_[table]->ReplayWAL(*store_map_[table]);
+        }
+
+        stats_map_[table].vector_count = store_map_[table]->GetStore().size();
     }
 
-    stats_.vector_count = store_->GetStore().size();
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
 }
 
@@ -42,9 +50,16 @@ Engine::~Engine() {
     if (cleanup_thread_.joinable()) {
         cleanup_thread_.join();
     }
-    Cleanup(true);
-    persistence_manager_->SaveSnapshot(*store_);
-    persistence_manager_->ClearWAL();
+
+
+    for (auto& [table, store] : store_map_) {
+        if (!persistence_manager_map_.contains(table)) {
+            continue;
+        }
+        Cleanup(table, true);
+        persistence_manager_map_[table]->SaveSnapshot(*store);
+        persistence_manager_map_[table]->ClearWAL();
+    }
 }
 
 bool Engine::Insert(std::string table_name, Id id, const Vector& vector, const std::string& content) {
@@ -73,7 +88,7 @@ bool Engine::Remove(std::string table_name, Id id) {
 
     bool ok = store_map_[table_name]->Remove(id);
     if (ok) {
-        removed_ = true;
+        removed_flag_map_[table_name] = true;
         stats_map_[table_name].deleted_count++;
         stats_map_[table_name].stale_count++;
         metrics_map_[table_name].remove_count++;
@@ -97,7 +112,7 @@ std::vector<VectorStore::Data> Engine::Search(std::string table_name, const Vect
     return data;
 }
 
-Engine::Stats Engine::GetStats(std::string table_name) const {
+Engine::Stats Engine::GetStats(std::string table_name) {
     std::shared_lock lock(engine_mutex_);
     if (shutdown_ || table_name.empty() || !stats_map_.contains(table_name)) {
         return {};
@@ -106,7 +121,7 @@ Engine::Stats Engine::GetStats(std::string table_name) const {
     return stats_map_[table_name];
 }
 
-Engine::Metrics Engine::GetMetrics(std::string table_name) const {
+Engine::Metrics Engine::GetMetrics(std::string table_name) {
     std::shared_lock lock(engine_mutex_);
     if (shutdown_ || table_name.empty() || !metrics_map_.contains(table_name)) {
         return {};
@@ -121,7 +136,7 @@ bool Engine::CreateTable(std::string name) {
         return false;
     }
 
-    if (store_map_.contains(name) || persistence_manager_map_.contains(name)) {
+    if (store_map_.contains(name) || persistence_manager_map_.contains(name) || stats_map_.contains(name) || metrics_map_.contains(name) || removed_flag_map_.contains(name)) {
         return false;
     }
 
@@ -141,7 +156,7 @@ bool Engine::CreateTable(std::string name) {
     auto persistence_manager = std::make_unique<VectorPersistenceManager>(store_snapshot, index_snapshot, write_ahead_log);
 
     store_map_[name] = std::move(vector_store);
-    persistence_manager_map[name] = std::move(persistence_manager);
+    persistence_manager_map_[name] = std::move(persistence_manager);
     stats_map_[name] = {};
     metrics_map_[name] = {};
     removed_flag_map_[name] = false;
@@ -158,17 +173,20 @@ void Engine::BackgroundCleanupLoop() {
             break;
         }
 
-        if (removed_) {
-            auto start = std::chrono::steady_clock::now();
-            Cleanup(false);
-            auto end = std::chrono::steady_clock::now();
-            auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-            std::cout << "cleanup completed in " << duration_ms << " ms\n";
+        for (auto& [table, store] : store_map_) {
+            if (removed_flag_map_.contains(table) && removed_flag_map_[table]) {
+                auto start = std::chrono::steady_clock::now();
+                Cleanup(table, false);
+                auto end = std::chrono::steady_clock::now();
+                auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+                std::cout << "cleanup completed in " << duration_ms << " ms\n";
+                removed_flag_map_[table] = false;
+            }
         }
     }
 }
 
-void Engine::Cleanup(std::string table_name, bool force) {
+void Engine::Cleanup(const std::string& table_name, bool force) {
     if ((shutdown_ && !force) || (!store_map_.contains(table_name)|| !stats_map_.contains(table_name) || !metrics_map_.contains(table_name))) {
         return;
     }
@@ -182,7 +200,7 @@ void Engine::Cleanup(std::string table_name, bool force) {
     store_map_[table_name]->Cleanup(reindex);
     metrics_map_[table_name].cleanup_count++;
 
-    removed_ = false;
+    removed_flag_map_[table_name] = false;
     stats_map_[table_name].vector_count = stats_map_[table_name].vector_count - stats_map_[table_name].deleted_count;
     stats_map_[table_name].deleted_count = 0;
 

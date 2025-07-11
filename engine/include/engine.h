@@ -34,20 +34,20 @@ public:
         uint64_t average_search_latency_ms = 0;
     };
 
-    explicit Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality, float reindex_threshold);
+    explicit Engine(float reindex_threshold);
     ~Engine();
 
     bool Insert(std::string table_name, Id id, const Vector& vector, const std::string& content);
     bool Remove(std::string table_name, Id id);
     std::vector<VectorStore::Data> Search(std::string table_name, const Vector& query, std::size_t k, std::size_t search_param);
 
-    Stats GetStats(std::string table_name) const;
-    Metrics GetMetrics(std::string table_name) const;
+    Stats GetStats(std::string table_name);
+    Metrics GetMetrics(std::string table_name);
 
     bool CreateTable(std::string name);
 
     void BackgroundCleanupLoop();
-    void Cleanup(bool force);
+    void Cleanup(const std::string& table_name, bool force);
 
 private:
     std::unique_ptr<VectorStore> store_;
