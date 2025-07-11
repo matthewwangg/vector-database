@@ -58,17 +58,19 @@ message Status {
   string message = 2;
 }
 
-message StatsRequest {}
+message StatsRequest {
+  string table = 1;
+}
 
 message StatsResponse {
   uint64 vector_count = 1;
   uint64 deleted_count = 2;
   uint64 stale_count = 3;
-
-  string table = 4;
 }
 
-message MetricsRequest {}
+message MetricsRequest {
+  string table = 1;
+}
 
 message MetricsResponse {
   uint64 insert_count = 1;
@@ -78,8 +80,6 @@ message MetricsResponse {
   uint64 reindex_count = 5;
 
   uint64 average_search_latency_ms = 6;
-
-  string table = 7;
 }
 
 message CreateTableRequest {
