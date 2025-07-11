@@ -12,7 +12,7 @@ VectorDatabaseServiceImpl::VectorDatabaseServiceImpl(std::unique_ptr<vector_db_e
 grpc::Status VectorDatabaseServiceImpl::Insert(grpc::ServerContext* context, const vector_db::InsertRequest* request, vector_db::InsertResponse* response) {
     vector_db_engine::Vector vector(request->vector().begin(), request->vector().end());
 
-    bool successful = engine_->Insert(request->id(), vector,request->content());
+    bool successful = engine_->Insert(request->table(), request->id(), vector,request->content());
     response->set_successful(successful);
 
     if (!successful) {
@@ -23,7 +23,7 @@ grpc::Status VectorDatabaseServiceImpl::Insert(grpc::ServerContext* context, con
 }
 
 grpc::Status VectorDatabaseServiceImpl::Remove(grpc::ServerContext* context, const vector_db::RemoveRequest* request, vector_db::RemoveResponse* response) {
-    bool successful = engine_->Remove(request->id());
+    bool successful = engine_->Remove(request->table(), request->id());
     response->set_successful(successful);
 
     if (!successful) {
@@ -36,7 +36,7 @@ grpc::Status VectorDatabaseServiceImpl::Remove(grpc::ServerContext* context, con
 grpc::Status VectorDatabaseServiceImpl::Search(grpc::ServerContext* context, const vector_db::SearchRequest* request, vector_db::SearchResponse* response) {
     vector_db_engine::Vector query(request->query().begin(), request->query().end());
 
-    std::vector<vector_db_engine::VectorStore::Data> data = engine_->Search(query, request->k(), request->search_parameter());
+    std::vector<vector_db_engine::VectorStore::Data> data = engine_->Search(request->table(), query, request->k(), request->search_parameter());
 
     for (const auto& item : data) {
         auto* result = response->add_data();
@@ -47,7 +47,7 @@ grpc::Status VectorDatabaseServiceImpl::Search(grpc::ServerContext* context, con
 }
 
 grpc::Status VectorDatabaseServiceImpl::Stats(grpc::ServerContext* context, const vector_db::StatsRequest* request, vector_db::StatsResponse* response) {
-    vector_db_engine::Engine::Stats stats = engine_->GetStats();
+    vector_db_engine::Engine::Stats stats = engine_->GetStats(request->table());
 
     response->set_vector_count(stats.vector_count);
     response->set_deleted_count(stats.deleted_count);
@@ -57,7 +57,7 @@ grpc::Status VectorDatabaseServiceImpl::Stats(grpc::ServerContext* context, cons
 }
 
 grpc::Status VectorDatabaseServiceImpl::Metrics(grpc::ServerContext* context, const vector_db::MetricsRequest* request, vector_db::MetricsResponse* response) {
-    vector_db_engine::Engine::Metrics metrics = engine_->GetMetrics();
+    vector_db_engine::Engine::Metrics metrics = engine_->GetMetrics(request->table());
 
     response->set_insert_count(metrics.insert_count);
     response->set_remove_count(metrics.remove_count);
@@ -65,6 +65,13 @@ grpc::Status VectorDatabaseServiceImpl::Metrics(grpc::ServerContext* context, co
     response->set_cleanup_count(metrics.cleanup_count);
     response->set_reindex_count(metrics.reindex_count);
     response->set_average_search_latency_ms(metrics.average_search_latency_ms);
+
+    return grpc::Status::OK;
+}
+
+grpc::Status VectorDatabaseServiceImpl::CreateTable(grpc::ServerContext* context, const vector_db::CreateTableRequest* request, vector_db::CreateTableResponse* response) {
+    bool ok = engine_->CreateTable(request->name());
+    response->set_successful(ok);
 
     return grpc::Status::OK;
 }

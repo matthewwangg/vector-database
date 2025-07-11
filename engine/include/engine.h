@@ -5,8 +5,10 @@
 #include <condition_variable>
 #include <cstdint>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include "persistence_manager.h"
@@ -32,25 +34,34 @@ public:
         uint64_t average_search_latency_ms = 0;
     };
 
-    explicit Engine(std::unique_ptr<VectorIndex> index, int vector_dimensionality, float reindex_threshold);
+    explicit Engine(float reindex_threshold);
     ~Engine();
 
-    bool Insert(Id id, const Vector& vector, const std::string& content);
-    bool Remove(Id id);
-    std::vector<VectorStore::Data> Search(const Vector& query, std::size_t k, std::size_t search_param);
+    bool Insert(std::string table_name, Id id, const Vector& vector, const std::string& content);
+    bool Remove(std::string table_name, Id id);
+    std::vector<VectorStore::Data> Search(std::string table_name, const Vector& query, std::size_t k, std::size_t search_param);
 
-    Stats GetStats() const;
-    Metrics GetMetrics() const;
+    Stats GetStats(std::string table_name);
+    Metrics GetMetrics(std::string table_name);
+
+    bool CreateTable(std::string name);
 
     void BackgroundCleanupLoop();
-    void Cleanup(bool force);
+    void Cleanup(const std::string& table_name, bool force);
 
 private:
     std::unique_ptr<VectorStore> store_;
     std::unique_ptr<VectorPersistenceManager> persistence_manager_;
-
     Stats stats_;
     Metrics metrics_;
+
+    std::unordered_map<std::string, std::unique_ptr<VectorStore>> store_map_;
+    std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>> persistence_manager_map_;
+    std::unordered_map<std::string, Stats> stats_map_;
+    std::unordered_map<std::string, Metrics> metrics_map_;
+    std::unordered_map<std::string, std::atomic<bool>> removed_flag_map_;
+
+    mutable std::shared_mutex engine_mutex_;
 
     float reindex_threshold_;
 
