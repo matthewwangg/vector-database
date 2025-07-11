@@ -19,6 +19,10 @@ VectorPersistenceManager::VectorPersistenceManager(std::string store_snapshot_fi
       index_snapshot_file_path_(GetFullFilepath(index_snapshot_file_path)),
       wal_file_path_(GetFullFilepath(wal_file_path))
 {
+    const std::string base = std::string(std::getenv("HOME")) + "/.vector_db/";
+    const std::string suffix = "_wal.log";
+    table_name_ = wal_file_path_.substr(base.size(), wal_file_path_.size() - base.size() - suffix.size());
+
     wal_out_.open(wal_file_path_, std::ios::app);
     if (!wal_out_) {
         std::cout << "failed to open write-ahead log" << std::endl;
@@ -109,7 +113,7 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
         return;
     }
 
-    std::cout << "snapshot saved successfully" << std::endl;
+    std::cout << table_name_ << " snapshot saved successfully" << std::endl;
 }
 
 std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
@@ -179,7 +183,7 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
         return nullptr;
     }
 
-    std::cout << "snapshot loaded successfully with " << store_snapshot.vector_entry_size() << " vectors, " << index_snapshot.nodes_size() << " index nodes, and dimensionality of " << store_snapshot.vector_dimensionality() << std::endl;
+    std::cout << table_name_ << " snapshot loaded successfully with " << store_snapshot.vector_entry_size() << " vectors, " << index_snapshot.nodes_size() << " index nodes, and dimensionality of " << store_snapshot.vector_dimensionality() << std::endl;
 
     return std::move(loaded_store);
 }
@@ -243,7 +247,7 @@ void VectorPersistenceManager::ReplayWAL(VectorStore& store) {
         return;
     }
 
-    std::cout << "write-ahead log replay completed" << std::endl;
+    std::cout << table_name_ << " write-ahead log replay completed" << std::endl;
 }
 
 void VectorPersistenceManager::ClearWAL() {
@@ -256,7 +260,7 @@ void VectorPersistenceManager::ClearWAL() {
         return;
     }
 
-    std::cout << "write-ahead log cleared" << std::endl;
+    std::cout << table_name_ << " write-ahead log cleared" << std::endl;
 }
 
 std::string VectorPersistenceManager::GetFullFilepath(std::string file_path) {
