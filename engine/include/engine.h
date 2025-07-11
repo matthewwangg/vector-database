@@ -45,6 +45,7 @@ public:
     Metrics GetMetrics(std::string table_name);
 
     bool CreateTable(std::string name);
+    bool DropTable(std::string name);
 
     void BackgroundCleanupLoop();
     void Cleanup(const std::string& table_name, bool force);

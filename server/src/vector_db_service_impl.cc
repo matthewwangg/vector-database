@@ -76,6 +76,13 @@ grpc::Status VectorDatabaseServiceImpl::CreateTable(grpc::ServerContext* context
     return grpc::Status::OK;
 }
 
+grpc::Status VectorDatabaseServiceImpl::DropTable(grpc::ServerContext* context, const vector_db::DropTableRequest* request, vector_db::DropTableResponse* response) {
+    bool ok = engine_->DropTable(request->name());
+    response->set_successful(ok);
+
+    return grpc::Status::OK;
+}
+
 grpc::Status VectorDatabaseServiceImpl::HealthCheck(grpc::ServerContext* context, const vector_db::Empty* request, vector_db::Status* response) {
     response->set_successful(true);
     response->set_message("Healthy!");

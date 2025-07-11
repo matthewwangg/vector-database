@@ -179,6 +179,27 @@ bool Engine::CreateTable(std::string name) {
     return true;
 }
 
+bool Engine::DropTable(std::string name) {
+    std::unique_lock lock(engine_mutex_);
+    if (shutdown_ || name.empty()) {
+        return false;
+    }
+
+    if (!store_map_.contains(name) || !persistence_manager_map_.contains(name) || !stats_map_.contains(name) || !metrics_map_.contains(name) || !removed_flag_map_.contains(name)) {
+        return false;
+    }
+
+    persistence_manager_map_[name]->Clear();
+
+    store_map_.erase(name);
+    persistence_manager_map_.erase(name);
+    stats_map_.erase(name);
+    metrics_map_.erase(name);
+    removed_flag_map_.erase(name);
+
+    return true;
+}
+
 void Engine::BackgroundCleanupLoop() {
     std::unique_lock<std::mutex> lock(cleanup_mutex_);
     while (!shutdown_) {

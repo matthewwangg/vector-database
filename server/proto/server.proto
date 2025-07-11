@@ -9,6 +9,8 @@ service VectorDatabase {
   rpc Stats(StatsRequest) returns (StatsResponse);
   rpc Metrics(MetricsRequest) returns (MetricsResponse);
   rpc CreateTable(CreateTableRequest) returns (CreateTableResponse);
+  rpc DropTable(DropTableRequest) returns (DropTableResponse);
+
 
   rpc HealthCheck(Empty) returns (Status);
 }
@@ -87,5 +89,13 @@ message CreateTableRequest {
 }
 
 message CreateTableResponse {
+  bool successful = 1;
+}
+
+message DropTableRequest {
+  string name = 1;
+}
+
+message DropTableResponse {
   bool successful = 1;
 }

@@ -263,6 +263,12 @@ void VectorPersistenceManager::ClearWAL() {
     std::cout << table_name_ << " write-ahead log cleared" << std::endl;
 }
 
+void VectorPersistenceManager::Clear() {
+    std::filesystem::remove(store_snapshot_file_path_);
+    std::filesystem::remove(index_snapshot_file_path_);
+    std::filesystem::remove(wal_file_path_);
+}
+
 std::string VectorPersistenceManager::GetFullFilepath(std::string file_path) {
     const char* home = std::getenv("HOME");
     if (!home) {

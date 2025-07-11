@@ -26,6 +26,7 @@ public:
     void AppendRemove(Id id);
     void ReplayWAL(VectorStore& store);
     void ClearWAL();
+    void Clear();
 
 private:
     std::string GetFullFilepath(std::string file_path);
