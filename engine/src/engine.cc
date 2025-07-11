@@ -28,6 +28,7 @@ Engine::Engine(float reindex_threshold)
         const std::string suffix = "_" + kWriteAheadLogFilename;
 
         const std::string base_directory = std::string(std::getenv("HOME")) + "/.vector_db";
+        std::filesystem::create_directories(base_directory);
         for (const auto& entry : std::filesystem::directory_iterator(base_directory)) {
             if (entry.is_regular_file()) {
                 std::string filename = entry.path().filename().string();
