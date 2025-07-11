@@ -48,7 +48,8 @@ Engine::~Engine() {
 }
 
 bool Engine::Insert(std::string table_name, Id id, const Vector& vector, const std::string& content) {
-    if (shutdown_ || name.empty()) {
+    std::shared_lock lock(engine_mutex_);
+    if (shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_map_.contains(table_name) || !metrics_map_.contains(table_name))) {
         return false;
     }
 
@@ -63,7 +64,8 @@ bool Engine::Insert(std::string table_name, Id id, const Vector& vector, const s
 }
 
 bool Engine::Remove(std::string table_name, Id id) {
-    if (shutdown_ || name.empty()) {
+    std::shared_lock lock(engine_mutex_);
+    if (shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_map_.contains(table_name) || !metrics_map_.contains(table_name))) {
         return false;
     }
 
@@ -80,7 +82,8 @@ bool Engine::Remove(std::string table_name, Id id) {
 }
 
 std::vector<VectorStore::Data> Engine::Search(std::string table_name, const Vector& query, std::size_t k, std::size_t search_param) {
-    if (shutdown_ || name.empty()) {
+    std::shared_lock lock(engine_mutex_);
+    if (shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !metrics_map_.contains(table_name))) {
         return {};
     }
 
@@ -95,7 +98,8 @@ std::vector<VectorStore::Data> Engine::Search(std::string table_name, const Vect
 }
 
 Engine::Stats Engine::GetStats(std::string table_name) const {
-    if (shutdown_ || name.empty()) {
+    std::shared_lock lock(engine_mutex_);
+    if (shutdown_ || table_name.empty() || !stats_map_.contains(table_name)) {
         return {};
     }
 
@@ -103,7 +107,8 @@ Engine::Stats Engine::GetStats(std::string table_name) const {
 }
 
 Engine::Metrics Engine::GetMetrics(std::string table_name) const {
-    if (shutdown_ || name.empty()) {
+    std::shared_lock lock(engine_mutex_);
+    if (shutdown_ || table_name.empty() || !metrics_map_.contains(table_name)) {
         return {};
     }
 
@@ -111,11 +116,10 @@ Engine::Metrics Engine::GetMetrics(std::string table_name) const {
 };
 
 bool Engine::CreateTable(std::string name) {
+    std::unique_lock lock(engine_mutex_);
     if (shutdown_ || name.empty()) {
         return false;
     }
-
-    std::unique_lock lock(engine_mutex_);
 
     if (store_map_.contains(name) || persistence_manager_map_.contains(name)) {
         return false;
@@ -165,7 +169,7 @@ void Engine::BackgroundCleanupLoop() {
 }
 
 void Engine::Cleanup(std::string table_name, bool force) {
-    if (shutdown_ && !force) {
+    if ((shutdown_ && !force) || (!store_map_.contains(table_name)|| !stats_map_.contains(table_name) || !metrics_map_.contains(table_name))) {
         return;
     }
 
