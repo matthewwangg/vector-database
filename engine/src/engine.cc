@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <chrono>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -23,13 +24,26 @@ Engine::Engine(float reindex_threshold)
       shutdown_(false)
 {
     std::vector<std::string> table_names = []() {
-        const std::string suffix = "_" + kStoreSnapshotFilename;
         std::vector<std::string> tables;
+        const std::string suffix = "_" + kStoreSnapshotFilename;
+
+        const std::string base_directory = std::string(std::getenv("HOME")) + "/.vector_db";
+        for (const auto& entry : std::filesystem::directory_iterator(base_directory)) {
+            if (entry.is_regular_file()) {
+                std::string filename = entry.path().filename().string();
+                if (filename.size() > suffix.size() && filename.compare(filename.size() - suffix.size(), suffix.size(), suffix) == 0) {
+                    tables.push_back(filename.substr(0, filename.size() - suffix.size()));
+                }
+            }
+        }
         return tables;
     }();
 
     for (const std::string& table : table_names) {
-        CreateTable(table);
+        bool ok = CreateTable(table);
+        if (!ok) {
+            continue;
+        }
         std::unique_ptr<VectorStore> loaded_store = persistence_manager_map_[table]->LoadSnapshot();
         if (loaded_store) {
             persistence_manager_map_[table]->ReplayWAL(*loaded_store);
@@ -128,7 +142,7 @@ Engine::Metrics Engine::GetMetrics(std::string table_name) {
     }
 
     return metrics_map_[table_name];
-};
+}
 
 bool Engine::CreateTable(std::string name) {
     std::unique_lock lock(engine_mutex_);
