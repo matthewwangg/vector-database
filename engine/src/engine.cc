@@ -182,7 +182,7 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
 
     std::vector<std::future<std::vector<VectorStore::Data>>> futures;
     for (const auto& [query, k, search_param] : requests) {
-        futures.push_back(std::async(std::launch::async, [this, table_name, query, k, search_param](){
+        futures.push_back(thread_pool_->EnqueueTask([this, table_name, query, k, search_param](){
             auto start = std::chrono::steady_clock::now();
             std::vector<VectorStore::Data> data = store_map_[table_name]->Search(query, k, search_param);
             auto end = std::chrono::steady_clock::now();
