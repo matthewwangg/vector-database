@@ -4,7 +4,9 @@
 #include <functional>
 #include <utility>
 
-ThreadPool::ThreadPool(std::size_t num_threads) {
+ThreadPool::ThreadPool(std::size_t num_threads)
+    : stop_(false)
+{
     for (std::size_t i = 0; i < num_threads; ++i) {
         threads_.emplace_back([this]() {
             while (true) {
@@ -27,5 +29,17 @@ ThreadPool::ThreadPool(std::size_t num_threads) {
                 task();
             }
         });
+    }
+}
+
+ThreadPool::~ThreadPool() {
+    {
+        std::unique_lock lock(queue_mutex_);
+        stop_ = true;
+    }
+    cv_.notify_all();
+
+    for (auto& thread : threads_) {
+        thread.join();
     }
 }
