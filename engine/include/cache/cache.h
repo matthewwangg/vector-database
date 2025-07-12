@@ -8,6 +8,7 @@
 
 namespace vector_db_engine {
 
+using CacheKey = std::size_t;
 using Id = std::uint64_t;
 using Vector = std::vector<float>;
 
@@ -22,9 +23,9 @@ public:
         std::vector<Data> data;
     };
 
-    virtual std::optional<CacheEntry> Get(const Vector& key) = 0;
-    virtual void Invalidate(const Vector& key) = 0;
-    virtual void Store(const Vector& key, const CacheEntry& entry) = 0;
+    virtual std::optional<CacheEntry> Get(const CacheKey& key) = 0;
+    virtual void Invalidate(const CacheKey& key) = 0;
+    virtual void Store(const CacheKey& key, const CacheEntry& entry) = 0;
 
     virtual ~Cache() = default;
 };
