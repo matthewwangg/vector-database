@@ -20,7 +20,7 @@ public:
             Vector vector;
             std::string content;
         };
-        std::vector<Data> data;
+        std::vector<std::vector<Data>> data;
     };
 
     virtual std::optional<CacheEntry> Get(const CacheKey& key) = 0;
