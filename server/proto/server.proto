@@ -6,11 +6,16 @@ service VectorDatabase {
   rpc Insert(InsertRequest) returns (InsertResponse);
   rpc Remove(RemoveRequest) returns (RemoveResponse);
   rpc Search(SearchRequest) returns (SearchResponse);
+
+  rpc BatchInsert(BatchInsertRequest) returns (BatchInsertResponse);
+  rpc BatchRemove(BatchRemoveRequest) returns (BatchRemoveResponse);
+  rpc BatchSearch(BatchSearchRequest) returns (BatchSearchResponse);
+
   rpc Stats(StatsRequest) returns (StatsResponse);
   rpc Metrics(MetricsRequest) returns (MetricsResponse);
+
   rpc CreateTable(CreateTableRequest) returns (CreateTableResponse);
   rpc DropTable(DropTableRequest) returns (DropTableResponse);
-
 
   rpc HealthCheck(Empty) returns (Status);
 }
@@ -30,7 +35,7 @@ message InsertResponse {
 message RemoveRequest{
   uint64 id = 1;
 
-  string table = 4;
+  string table = 2;
 }
 
 message RemoveResponse {
@@ -51,6 +56,54 @@ message SearchResponse {
     string content = 2;
   }
   repeated Data data = 1;
+}
+
+message BatchInsertRequest {
+  message VectorData {
+    uint64 id = 1;
+    repeated float vector = 2;
+    string content = 3;
+  }
+  repeated VectorData vector_data = 1;
+
+  string table = 2;
+}
+
+message BatchInsertResponse {
+  repeated bool successful = 1;
+}
+
+message BatchRemoveRequest{
+  repeated uint64 id = 1;
+
+  string table = 2;
+}
+
+message BatchRemoveResponse {
+  repeated bool successful = 1;
+}
+
+message BatchSearchRequest {
+  message Query {
+    repeated float query = 1;
+    uint32 k = 2;
+    uint32 search_parameter = 3;
+  }
+
+  repeated Query query = 1;
+  string table = 2;
+}
+
+message BatchSearchResponse {
+  message Result {
+    message Data {
+      uint64 id = 1;
+      string content = 2;
+    }
+    repeated Data data = 1;
+  }
+
+  repeated Result result = 1;
 }
 
 message Empty {}

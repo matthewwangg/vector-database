@@ -1,6 +1,8 @@
 #include "vector_db_service_impl.h"
 
 #include <memory>
+#include <tuple>
+#include <vector>
 
 #include "engine.h"
 #include "hnsw_index.h"
@@ -36,11 +38,55 @@ grpc::Status VectorDatabaseServiceImpl::Remove(grpc::ServerContext* context, con
 grpc::Status VectorDatabaseServiceImpl::Search(grpc::ServerContext* context, const vector_db::SearchRequest* request, vector_db::SearchResponse* response) {
     vector_db_engine::Vector query(request->query().begin(), request->query().end());
 
-    std::vector<vector_db_engine::VectorStore::Data> data = engine_->Search(request->table(), query, request->k(), request->search_parameter());
+    std::vector<vector_db_engine::VectorStore::Data> results = engine_->Search(request->table(), query, request->k(), request->search_parameter());
 
-    for (const auto& item : data) {
+    for (const auto& item : results) {
         auto* result = response->add_data();
         result->set_content(item.content);
+    }
+
+    return grpc::Status::OK;
+}
+
+grpc::Status VectorDatabaseServiceImpl::BatchInsert(grpc::ServerContext* context, const vector_db::BatchInsertRequest* request, vector_db::BatchInsertResponse* response) {
+    std::vector<std::tuple<vector_db_engine::Id, vector_db_engine::Vector, std::string>> vectors;
+
+    for (const auto& vector_data : request->vector_data()) {
+        vectors.emplace_back(vector_data.id(), vector_db_engine::Vector(vector_data.vector().begin(), vector_data.vector().end()), vector_data.content());
+    }
+
+    std::vector<bool> success_flags = engine_->BatchInsert(request->table(), vectors);
+    for (bool successful : success_flags) {
+        response->add_successful(successful);
+    }
+
+    return grpc::Status::OK;
+}
+
+grpc::Status VectorDatabaseServiceImpl::BatchRemove(grpc::ServerContext* context, const vector_db::BatchRemoveRequest* request, vector_db::BatchRemoveResponse* response) {
+    std::vector<vector_db_engine::Id> ids(request->id().begin(), request->id().end());
+
+    std::vector<bool> success_flags = engine_->BatchRemove(request->table(), ids);
+    for (bool successful : success_flags) {
+        response->add_successful(successful);
+    }
+
+    return grpc::Status::OK;
+}
+
+grpc::Status VectorDatabaseServiceImpl::BatchSearch(grpc::ServerContext* context, const vector_db::BatchSearchRequest* request, vector_db::BatchSearchResponse* response) {
+    std::vector<std::tuple<vector_db_engine::Vector, std::size_t, std::size_t>> requests;
+    for (const auto& query : request->query()) {
+        requests.emplace_back(vector_db_engine::Vector(query.query().begin(), query.query().end()), query.k(), query.search_parameter());
+    }
+
+    std::vector<std::vector<vector_db_engine::VectorStore::Data>> results = engine_->BatchSearch(request->table(), requests);
+    for (const auto& result_list : results) {
+        auto* result = response->add_result();
+        for (const auto& data : result_list) {
+            auto* add_data = result->add_data();
+            add_data->set_content(data.content);
+        }
     }
 
     return grpc::Status::OK;
