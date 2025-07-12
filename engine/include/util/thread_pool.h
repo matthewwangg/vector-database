@@ -4,9 +4,11 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstddef>
+#include <functional>
 #include <future>
-#include <queue>
+#include <memory>
 #include <mutex>
+#include <queue>
 #include <vector>
 
 class ThreadPool {
@@ -15,7 +17,7 @@ public:
     ~ThreadPool();
 
     template<typename Function, typename... Arguments>
-    auto Enqueue(Function&& function, Arguments&&... arguments) -> std::future<std::invoke_result_t<Function, Arguments...>>;
+    auto EnqueueTask(Function&& function, Arguments&&... arguments) -> std::future<std::invoke_result_t<Function, Arguments...>>;
 
 private:
     std::vector<std::thread> threads_;
@@ -27,8 +29,17 @@ private:
 };
 
 template<typename Function, typename... Arguments>
-auto Enqueue(Function&& function, Arguments&&... arguments) -> std::future<std::invoke_result_t<Function, Arguments...>> {
-
+auto ThreadPool::EnqueueTask(Function&& function, Arguments&&... arguments) -> std::future<std::invoke_result_t<Function, Arguments...>> {
+    auto task = std::shared_ptr<std::invoke_result_t<Function, Arguments...>>(std::bind(std::forward<Function>(function), std::forward<Arguments>(arguments)...));
+    std::future<std::invoke_result_t<Function, Arguments...>> result = task->get_future();
+    {
+        std::unique_lock lock(queue_mutex_);
+        tasks_.emplace([task]() {
+            (*task)();
+        });
+    }
+    cv_.notify_one();
+    return result;
 }
 
 #endif //VECTOR_DATABASE_THREAD_POOL_H
