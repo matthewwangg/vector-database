@@ -4,6 +4,8 @@
 #include <functional>
 #include <utility>
 
+namespace vector_db_engine {
+
 ThreadPool::ThreadPool(std::size_t num_threads)
     : stop_(false)
 {
@@ -42,4 +44,6 @@ ThreadPool::~ThreadPool() {
     for (auto& thread : threads_) {
         thread.join();
     }
+}
+
 }

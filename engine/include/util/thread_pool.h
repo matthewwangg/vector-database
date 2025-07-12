@@ -11,6 +11,8 @@
 #include <queue>
 #include <vector>
 
+namespace vector_db_engine {
+
 class ThreadPool {
 public:
     explicit ThreadPool(std::size_t num_threads);
@@ -41,5 +43,7 @@ auto ThreadPool::EnqueueTask(Function&& function, Arguments&&... arguments) -> s
     cv_.notify_one();
     return result;
 }
+
+} // namespace vector_db_engine
 
 #endif //VECTOR_DATABASE_THREAD_POOL_H
