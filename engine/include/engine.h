@@ -8,6 +8,7 @@
 #include <shared_mutex>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -40,6 +41,10 @@ public:
     bool Insert(std::string table_name, Id id, const Vector& vector, const std::string& content);
     bool Remove(std::string table_name, Id id);
     std::vector<VectorStore::Data> Search(std::string table_name, const Vector& query, std::size_t k, std::size_t search_param);
+
+    std::vector<bool> BatchInsert(std::string table_name, const std::vector<std::tuple<Id, Vector, std::string>> vectors);
+    std::vector<bool> BatchRemove(std::string table_name, std::vector<Id> ids);
+    std::vector<std::vector<VectorStore::Data>> BatchSearch(std::string table_name, const std::vector<std::tuple<Vector, std::size_t, std::size_t>>& requests);
 
     Stats GetStats(std::string table_name);
     Metrics GetMetrics(std::string table_name);

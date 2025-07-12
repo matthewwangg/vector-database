@@ -127,6 +127,71 @@ std::vector<VectorStore::Data> Engine::Search(std::string table_name, const Vect
     return data;
 }
 
+std::vector<bool> Engine::BatchInsert(std::string table_name, const std::vector<std::tuple<Id, Vector, std::string>> vectors) {
+    std::shared_lock lock(engine_mutex_);
+    if (shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_map_.contains(table_name) || !metrics_map_.contains(table_name))) {
+        return std::vector<bool>(vectors.size(), false);
+    }
+
+    std::vector<bool> success_flags;
+    success_flags.reserve(vectors.size());
+    for (const auto& [id, vector, content] : vectors) {
+        persistence_manager_map_[table_name]->AppendInsert(id, vector, content);
+
+        bool ok = store_map_[table_name]->Insert(id, vector, content);
+        if (ok) {
+            stats_map_[table_name].vector_count++;
+            metrics_map_[table_name].insert_count++;
+        }
+        success_flags.push_back(ok);
+    }
+    return success_flags;
+}
+
+std::vector<bool> Engine::BatchRemove(std::string table_name, std::vector<Id> ids) {
+    std::shared_lock lock(engine_mutex_);
+    if (shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_map_.contains(table_name) || !metrics_map_.contains(table_name))) {
+        return std::vector<bool>(ids.size(), false);
+    }
+
+    std::vector<bool> success_flags;
+    success_flags.reserve(ids.size());
+    for (const Id& id : ids) {
+        persistence_manager_map_[table_name]->AppendRemove(id);
+
+        bool ok = store_map_[table_name]->Remove(id);
+        if (ok) {
+            removed_flag_map_[table_name] = true;
+            stats_map_[table_name].deleted_count++;
+            stats_map_[table_name].stale_count++;
+            metrics_map_[table_name].remove_count++;
+        }
+        success_flags.push_back(ok);
+    }
+    return success_flags;
+}
+
+std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string table_name, const std::vector<std::tuple<Vector, std::size_t, std::size_t>>& requests) {
+    std::shared_lock lock(engine_mutex_);
+    if (shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !metrics_map_.contains(table_name))) {
+        return {};
+    }
+
+    std::vector<std::vector<VectorStore::Data>> results;
+    results.reserve(requests.size());
+    for (const auto& [query, k, search_param] : requests) {
+        auto start = std::chrono::steady_clock::now();
+        std::vector<VectorStore::Data> data = store_map_[table_name]->Search(query, k, search_param);
+        auto end = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        metrics_map_[table_name].average_search_latency_ms = (metrics_map_[table_name].average_search_latency_ms * metrics_map_[table_name].search_count + duration) / (metrics_map_[table_name].search_count + 1);
+        metrics_map_[table_name].search_count++;
+
+        results.push_back(data);
+    }
+    return results;
+}
+
 Engine::Stats Engine::GetStats(std::string table_name) {
     std::shared_lock lock(engine_mutex_);
     if (shutdown_ || table_name.empty() || !stats_map_.contains(table_name)) {

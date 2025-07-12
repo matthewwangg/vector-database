@@ -81,7 +81,6 @@ grpc::Status VectorDatabaseServiceImpl::BatchSearch(grpc::ServerContext* context
     }
 
     std::vector<std::vector<vector_db_engine::VectorStore::Data>> results = engine_->BatchSearch(request->table(), requests);
-
     for (const auto& result_list : results) {
         auto* result = response->add_result();
         for (const auto& data : result_list) {
