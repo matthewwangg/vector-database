@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <chrono>
 #include <filesystem>
+#include <future>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -176,18 +177,26 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
         return {};
     }
 
+    std::vector<std::future<std::vector<VectorStore::Data>>> futures;
+    for (const auto& [query, k, search_param] : requests) {
+        futures.push_back(std::async(std::launch::async, [this, table_name, query, k, search_param](){
+            auto start = std::chrono::steady_clock::now();
+            std::vector<VectorStore::Data> data = store_map_[table_name]->Search(query, k, search_param);
+            auto end = std::chrono::steady_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            metrics_map_[table_name].average_search_latency_ms = (metrics_map_[table_name].average_search_latency_ms * metrics_map_[table_name].search_count + duration) / (metrics_map_[table_name].search_count + 1);
+            metrics_map_[table_name].search_count++;
+
+            return data;
+        }));
+    }
+
     std::vector<std::vector<VectorStore::Data>> results;
     results.reserve(requests.size());
-    for (const auto& [query, k, search_param] : requests) {
-        auto start = std::chrono::steady_clock::now();
-        std::vector<VectorStore::Data> data = store_map_[table_name]->Search(query, k, search_param);
-        auto end = std::chrono::steady_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        metrics_map_[table_name].average_search_latency_ms = (metrics_map_[table_name].average_search_latency_ms * metrics_map_[table_name].search_count + duration) / (metrics_map_[table_name].search_count + 1);
-        metrics_map_[table_name].search_count++;
-
-        results.push_back(data);
+    for (auto& data_vector : futures) {
+        results.push_back(data_vector.get());
     }
+
     return results;
 }
 
