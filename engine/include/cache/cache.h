@@ -1,0 +1,34 @@
+#ifndef VECTOR_DATABASE_CACHE_H
+#define VECTOR_DATABASE_CACHE_H
+
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace vector_db_engine {
+
+using Id = std::uint64_t;
+using Vector = std::vector<float>;
+
+class Cache {
+public:
+    struct CacheEntry {
+        struct Data {
+            Id id;
+            Vector vector;
+            std::string content;
+        };
+        std::vector<Data> data;
+    };
+
+    virtual std::optional<CacheEntry> Get(const Vector& key) = 0;
+    virtual void Invalidate(const Vector& key) = 0;
+    virtual void Store(const Vector& key, const CacheEntry& entry) = 0;
+
+    virtual ~Cache() = default;
+};
+
+} // namespace vector_db_engine
+
+#endif //VECTOR_DATABASE_CACHE_H
