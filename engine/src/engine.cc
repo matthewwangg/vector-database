@@ -66,7 +66,6 @@ Engine::~Engine() {
         cleanup_thread_.join();
     }
 
-
     for (auto& [table, store] : store_map_) {
         if (!persistence_manager_map_.contains(table)) {
             continue;

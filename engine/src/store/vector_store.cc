@@ -26,6 +26,7 @@ bool VectorStore::Insert(Id id, const Vector& vector, const std::string& content
     }
 
     store_[id] = Data{
+        .id = id,
         .vector = vector,
         .content = content,
     };

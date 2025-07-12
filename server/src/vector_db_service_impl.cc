@@ -41,8 +41,9 @@ grpc::Status VectorDatabaseServiceImpl::Search(grpc::ServerContext* context, con
     std::vector<vector_db_engine::VectorStore::Data> results = engine_->Search(request->table(), query, request->k(), request->search_parameter());
 
     for (const auto& item : results) {
-        auto* result = response->add_data();
-        result->set_content(item.content);
+        auto* data = response->add_data();
+        data->set_id(item.id);
+        data->set_content(item.content);
     }
 
     return grpc::Status::OK;
@@ -85,6 +86,7 @@ grpc::Status VectorDatabaseServiceImpl::BatchSearch(grpc::ServerContext* context
         auto* result = response->add_result();
         for (const auto& data : result_list) {
             auto* add_data = result->add_data();
+            add_data->set_id(data.id);
             add_data->set_content(data.content);
         }
     }

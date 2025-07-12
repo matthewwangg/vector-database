@@ -18,6 +18,7 @@ using Vector = std::vector<float>;
 class VectorStore {
 public:
     struct Data {
+        Id id;
         Vector vector;
         std::string content;
     };

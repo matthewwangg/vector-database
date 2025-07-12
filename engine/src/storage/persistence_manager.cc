@@ -174,7 +174,7 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
     for (const auto& vector_entry : store_snapshot.vector_entry()) {
         Vector vector(vector_entry.vector().begin(), vector_entry.vector().end());
         Id id = vector_entry.id();
-        reconstructed_store[id] = { vector, vector_entry.content() };
+        reconstructed_store[id] = { id, vector, vector_entry.content() };
     }
 
     std::unique_ptr<VectorStore> loaded_store = std::make_unique<VectorStore>(std::move(reconstructed_index), store_snapshot.vector_dimensionality(), reconstructed_store);
