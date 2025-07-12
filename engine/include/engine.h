@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "persistence_manager.h"
+#include "thread_pool.h"
 #include "vector_store.h"
 
 namespace vector_db_engine {
@@ -70,6 +71,8 @@ private:
     mutable std::shared_mutex engine_mutex_;
 
     float reindex_threshold_;
+
+    std::unique_ptr<ThreadPool> thread_pool_;
 
     std::thread cleanup_thread_;
     std::atomic<bool> shutdown_;

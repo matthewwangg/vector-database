@@ -7,9 +7,11 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "hnsw_index.h"
+#include "thread_pool.h"
 #include "vector_store.h"
 
 namespace vector_db_engine {
@@ -57,6 +59,7 @@ Engine::Engine(float reindex_threshold)
         stats_map_[table].vector_count = store_map_[table]->GetStore().size();
     }
 
+    thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
 }
 
