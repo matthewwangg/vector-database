@@ -12,7 +12,7 @@ namespace vector_db_engine {
 
 class LRUCache : public Cache {
 public:
-    explicit LRUCache(std::size_t cache_size);
+    explicit LRUCache(std::size_t max_cache_size);
 
     std::optional<CacheEntry> Get(const CacheKey& key) override;
     void Invalidate(const CacheKey& key) override;
@@ -22,8 +22,7 @@ private:
     std::unordered_map<CacheKey, std::pair<CacheEntry, std::list<CacheKey>::iterator>> cache_;
     std::list<CacheKey> keys_;
 
-    std::size_t cache_size_;
-    std::size_t current_count_;
+    std::size_t max_cache_size_;
 };
 
 } // namespace vector_db_engine
