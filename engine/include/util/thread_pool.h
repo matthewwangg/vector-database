@@ -21,7 +21,7 @@ public:
 
 private:
     std::vector<std::thread> threads_;
-    std::queue<std::function<void>> tasks_;
+    std::queue<std::function<void()>> tasks_;
 
     std::mutex queue_mutex_;
     std::condition_variable cv_;
@@ -30,7 +30,7 @@ private:
 
 template<typename Function, typename... Arguments>
 auto ThreadPool::EnqueueTask(Function&& function, Arguments&&... arguments) -> std::future<std::invoke_result_t<Function, Arguments...>> {
-    auto task = std::shared_ptr<std::invoke_result_t<Function, Arguments...>>(std::bind(std::forward<Function>(function), std::forward<Arguments>(arguments)...));
+    auto task = std::make_shared<std::packaged_task<std::invoke_result_t<Function, Arguments...>()>>(std::bind(std::forward<Function>(function), std::forward<Arguments>(arguments)...));
     std::future<std::invoke_result_t<Function, Arguments...>> result = task->get_future();
     {
         std::unique_lock lock(queue_mutex_);

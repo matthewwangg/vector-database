@@ -1,1 +1,31 @@
 #include "thread_pool.h"
+
+#include <cstddef>
+#include <functional>
+#include <utility>
+
+ThreadPool::ThreadPool(std::size_t num_threads) {
+    for (std::size_t i = 0; i < num_threads; ++i) {
+        threads_.emplace_back([this]() {
+            while (true) {
+                std::function<void()> task;
+
+                {
+                    std::unique_lock lock(queue_mutex_);
+                    cv_.wait(lock, [this]() {
+                        return stop_ || !tasks_.empty();
+                    });
+
+                    if (stop_ && tasks_.empty()) {
+                        break;
+                    }
+
+                    task = std::move(tasks_.front());
+                    tasks_.pop();
+                }
+
+                task();
+            }
+        });
+    }
+}

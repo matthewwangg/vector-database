@@ -4,6 +4,7 @@ add_library(engine
         src/index/hnsw_index.cc
         src/storage/persistence_manager.cc
         proto/storage.pb.cc
+        src/util/thread_pool.cc
 )
 
 target_include_directories(engine PUBLIC
