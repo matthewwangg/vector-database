@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <list>
+#include <shared_mutex>
 #include <optional>
 #include <unordered_map>
 
@@ -23,6 +24,8 @@ private:
     std::list<CacheKey> keys_;
 
     std::size_t max_cache_size_;
+
+    mutable std::shared_mutex cache_mutex_;
 };
 
 } // namespace vector_db_engine

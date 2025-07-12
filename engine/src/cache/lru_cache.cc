@@ -9,6 +9,7 @@ LRUCache::LRUCache(std::size_t max_cache_size)
 {}
 
 std::optional<LRUCache::CacheEntry> LRUCache::Get(const CacheKey& key) {
+    std::unique_lock write_lock(cache_mutex_);
     auto it = cache_.find(key);
     if (it == cache_.end()) {
         return std::nullopt;
@@ -22,6 +23,7 @@ std::optional<LRUCache::CacheEntry> LRUCache::Get(const CacheKey& key) {
 }
 
 void LRUCache::Invalidate(const CacheKey& key) {
+    std::unique_lock lock(cache_mutex_);
     auto it = cache_.find(key);
     if (it == cache_.end()) {
         return;
@@ -32,6 +34,7 @@ void LRUCache::Invalidate(const CacheKey& key) {
 }
 
 void LRUCache::Store(const CacheKey& key, const CacheEntry& entry) {
+    std::unique_lock lock(cache_mutex_);
     if (auto it = cache_.find(key); it != cache_.end()) {
         keys_.erase(it->second.second);
         keys_.push_back(key);
