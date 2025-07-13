@@ -134,7 +134,7 @@ message MetricsResponse {
   uint64 cleanup_count = 4;
   uint64 reindex_count = 5;
 
-  uint64 average_search_latency_ms = 6;
+  float average_search_latency_ms = 6;
 }
 
 message CreateTableRequest {

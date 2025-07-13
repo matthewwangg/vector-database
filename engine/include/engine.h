@@ -34,7 +34,7 @@ public:
         uint64_t cleanup_count = 0;
         uint64_t reindex_count = 0;
 
-        uint64_t average_search_latency_ms = 0;
+        float average_search_latency_ms = 0.0f;
     };
 
     explicit Engine(float reindex_threshold);

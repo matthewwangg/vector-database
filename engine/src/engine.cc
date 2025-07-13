@@ -123,7 +123,7 @@ std::vector<VectorStore::Data> Engine::Search(std::string table_name, const Vect
     auto start = std::chrono::steady_clock::now();
     std::vector<VectorStore::Data> data = store_map_[table_name]->Search(query, k, search_param);
     auto end = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    auto duration = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()) / 1000;
     metrics_map_[table_name].average_search_latency_ms = (metrics_map_[table_name].average_search_latency_ms * metrics_map_[table_name].search_count + duration) / (metrics_map_[table_name].search_count + 1);
     metrics_map_[table_name].search_count++;
 
@@ -214,7 +214,7 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
             auto start = std::chrono::steady_clock::now();
             std::vector<VectorStore::Data> data = store_map_[table_name]->Search(query, k, search_param);
             auto end = std::chrono::steady_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            auto duration = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()) / 1000;
             metrics_map_[table_name].average_search_latency_ms = (metrics_map_[table_name].average_search_latency_ms * metrics_map_[table_name].search_count + duration) / (metrics_map_[table_name].search_count + 1);
             metrics_map_[table_name].search_count++;
             return data;
