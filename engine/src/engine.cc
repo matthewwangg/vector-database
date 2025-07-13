@@ -176,20 +176,47 @@ std::vector<bool> Engine::BatchRemove(std::string table_name, std::vector<Id> id
 
 std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string table_name, const std::vector<std::tuple<Vector, std::size_t, std::size_t>>& requests) {
     std::shared_lock lock(engine_mutex_);
-    if (shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !metrics_map_.contains(table_name))) {
+    if (shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !metrics_map_.contains(table_name)) || !cache_map_.contains(table_name)) {
         return {};
+    }
+
+    auto hash_key = [&](){
+        std::size_t hash = requests.size();
+        for (const auto& [vector, k, search_param] : requests) {
+            hash ^= k;
+            hash ^= search_param;
+            for (std::size_t i = 0; i < vector.size(); i += 2) {
+                hash ^= std::hash<float>{}(vector[i]);
+            }
+        }
+        return hash;
+    }();
+
+    std::optional<Cache::CacheEntry> cache_entry = cache_map_[table_name]->Get(hash_key);
+    if (cache_entry.has_value()) {
+        return [&]() {
+            std::vector<std::vector<VectorStore::Data>> results;
+            results.reserve(cache_entry->data.size());
+            for (const auto& group : cache_entry->data) {
+                std::vector<VectorStore::Data> result_group;
+                for (const auto& data : group) {
+                    result_group.emplace_back(VectorStore::Data{data.id, data.vector, data.content});
+                }
+                results.emplace_back(std::move(result_group));
+            }
+            return results;
+        }();
     }
 
     std::vector<std::future<std::vector<VectorStore::Data>>> futures;
     for (const auto& [query, k, search_param] : requests) {
-        futures.push_back(thread_pool_->EnqueueTask([this, table_name, query, k, search_param](){
+        futures.push_back(thread_pool_->EnqueueTask([this, table_name, query, k, search_param]() {
             auto start = std::chrono::steady_clock::now();
             std::vector<VectorStore::Data> data = store_map_[table_name]->Search(query, k, search_param);
             auto end = std::chrono::steady_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
             metrics_map_[table_name].average_search_latency_ms = (metrics_map_[table_name].average_search_latency_ms * metrics_map_[table_name].search_count + duration) / (metrics_map_[table_name].search_count + 1);
             metrics_map_[table_name].search_count++;
-
             return data;
         }));
     }
@@ -199,6 +226,21 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
     for (auto& data_vector : futures) {
         results.push_back(data_vector.get());
     }
+
+    Cache::CacheEntry new_entry = [&]() {
+        Cache::CacheEntry entry;
+        entry.data.reserve(results.size());
+        for (const auto& result_group : results) {
+            std::vector<Cache::CacheEntry::Data> data_group;
+            data_group.reserve(result_group.size());
+            for (const auto& data : result_group) {
+                data_group.emplace_back(Cache::CacheEntry::Data{data.id, data.vector, data.content});
+            }
+            entry.data.emplace_back(data_group);
+        }
+        return entry;
+    }();
+    cache_map_[table_name]->Store(hash_key, new_entry);
 
     return results;
 }
@@ -227,7 +269,7 @@ bool Engine::CreateTable(std::string name) {
         return false;
     }
 
-    if (store_map_.contains(name) || persistence_manager_map_.contains(name) || stats_map_.contains(name) || metrics_map_.contains(name) || removed_flag_map_.contains(name)) {
+    if (store_map_.contains(name) || persistence_manager_map_.contains(name) || stats_map_.contains(name) || metrics_map_.contains(name) || removed_flag_map_.contains(name) || cache_map_.contains(name)) {
         return false;
     }
 
@@ -238,6 +280,8 @@ bool Engine::CreateTable(std::string name) {
     int vector_dimensionality = 384;
     auto distance_metric = vector_db_engine::HNSWIndex::DistanceMetric::L2;
 
+    std::size_t cache_size = 32;
+
     std::string store_snapshot = name + "_" + kStoreSnapshotFilename;
     std::string index_snapshot = name + "_" + kIndexSnapshotFilename;
     std::string write_ahead_log = name + "_" + kWriteAheadLogFilename;
@@ -245,12 +289,14 @@ bool Engine::CreateTable(std::string name) {
     auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality);
     auto vector_store = std::make_unique<VectorStore>(std::move(hnsw_index), vector_dimensionality);
     auto persistence_manager = std::make_unique<VectorPersistenceManager>(store_snapshot, index_snapshot, write_ahead_log);
+    auto lru_cache = std::make_unique<LRUCache>(cache_size);
 
     store_map_[name] = std::move(vector_store);
     persistence_manager_map_[name] = std::move(persistence_manager);
     stats_map_[name] = {};
     metrics_map_[name] = {};
     removed_flag_map_[name] = false;
+    cache_map_[name] = std::move(lru_cache);
 
     return true;
 }
@@ -261,7 +307,7 @@ bool Engine::DropTable(std::string name) {
         return false;
     }
 
-    if (!store_map_.contains(name) || !persistence_manager_map_.contains(name) || !stats_map_.contains(name) || !metrics_map_.contains(name) || !removed_flag_map_.contains(name)) {
+    if (!store_map_.contains(name) || !persistence_manager_map_.contains(name) || !stats_map_.contains(name) || !metrics_map_.contains(name) || !removed_flag_map_.contains(name) || !cache_map_.contains(name)) {
         return false;
     }
 
@@ -272,6 +318,7 @@ bool Engine::DropTable(std::string name) {
     stats_map_.erase(name);
     metrics_map_.erase(name);
     removed_flag_map_.erase(name);
+    cache_map_.erase(name);
 
     return true;
 }

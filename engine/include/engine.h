@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "lru_cache.h"
 #include "persistence_manager.h"
 #include "thread_pool.h"
 #include "vector_store.h"
@@ -67,6 +68,7 @@ private:
     std::unordered_map<std::string, Stats> stats_map_;
     std::unordered_map<std::string, Metrics> metrics_map_;
     std::unordered_map<std::string, std::atomic<bool>> removed_flag_map_;
+    std::unordered_map<std::string, std::unique_ptr<Cache>> cache_map_;
 
     mutable std::shared_mutex engine_mutex_;
 
