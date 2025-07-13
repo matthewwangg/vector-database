@@ -1,5 +1,6 @@
 #include "lru_cache.h"
 
+#include <mutex>
 #include <optional>
 
 namespace vector_db_engine {
