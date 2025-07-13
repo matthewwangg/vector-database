@@ -135,6 +135,11 @@ message MetricsResponse {
   uint64 reindex_count = 5;
 
   float average_search_latency_ms = 6;
+  float max_search_latency_ms = 7;
+  float min_search_latency_ms = 8;
+
+  uint64 cache_hit = 9;
+  uint64 cache_miss = 10;
 }
 
 message CreateTableRequest {

@@ -194,6 +194,7 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
 
     std::optional<Cache::CacheEntry> cache_entry = cache_map_[table_name]->Get(hash_key);
     if (cache_entry.has_value()) {
+        metrics_map_[table_name].cache_hit++;
         return [&]() {
             std::vector<std::vector<VectorStore::Data>> results;
             results.reserve(cache_entry->data.size());
@@ -207,6 +208,7 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
             return results;
         }();
     }
+    metrics_map_[table_name].cache_miss++;
 
     std::vector<std::future<std::vector<VectorStore::Data>>> futures;
     for (const auto& [query, k, search_param] : requests) {
@@ -215,6 +217,8 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
             std::vector<VectorStore::Data> data = store_map_[table_name]->Search(query, k, search_param);
             auto end = std::chrono::steady_clock::now();
             auto duration = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()) / 1000;
+            metrics_map_[table_name].min_search_latency_ms = std::min(metrics_map_[table_name].min_search_latency_ms, static_cast<float>(duration));
+            metrics_map_[table_name].max_search_latency_ms = std::max(metrics_map_[table_name].max_search_latency_ms, static_cast<float>(duration));
             metrics_map_[table_name].average_search_latency_ms = (metrics_map_[table_name].average_search_latency_ms * metrics_map_[table_name].search_count + duration) / (metrics_map_[table_name].search_count + 1);
             metrics_map_[table_name].search_count++;
             return data;

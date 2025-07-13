@@ -35,6 +35,11 @@ public:
         uint64_t reindex_count = 0;
 
         float average_search_latency_ms = 0.0f;
+        float max_search_latency_ms = 0.0f;
+        float min_search_latency_ms = std::numeric_limits<float>::max();
+
+        uint64_t cache_hit = 0;
+        uint64_t cache_miss = 0;
     };
 
     explicit Engine(float reindex_threshold);

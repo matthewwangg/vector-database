@@ -112,7 +112,13 @@ grpc::Status VectorDatabaseServiceImpl::Metrics(grpc::ServerContext* context, co
     response->set_search_count(metrics.search_count);
     response->set_cleanup_count(metrics.cleanup_count);
     response->set_reindex_count(metrics.reindex_count);
+
     response->set_average_search_latency_ms(metrics.average_search_latency_ms);
+    response->set_min_search_latency_ms(metrics.min_search_latency_ms);
+    response->set_max_search_latency_ms(metrics.max_search_latency_ms);
+
+    response->set_cache_hit(metrics.cache_hit);
+    response->set_cache_miss(metrics.cache_miss);
 
     return grpc::Status::OK;
 }
