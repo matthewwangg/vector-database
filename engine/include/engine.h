@@ -42,7 +42,7 @@ public:
         uint64_t cache_miss = 0;
     };
 
-    explicit Engine(float reindex_threshold);
+    explicit Engine(float reindex_threshold, bool use_cache);
     ~Engine();
 
     bool Insert(std::string table_name, Id id, const Vector& vector, const std::string& content);
@@ -78,6 +78,7 @@ private:
     mutable std::shared_mutex engine_mutex_;
 
     float reindex_threshold_;
+    bool use_cache_;
 
     std::unique_ptr<ThreadPool> thread_pool_;
 

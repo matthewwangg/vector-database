@@ -22,8 +22,9 @@ inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
 inline const std::string kWriteAheadLogFilename = "wal.log";
 
-Engine::Engine(float reindex_threshold)
+Engine::Engine(float reindex_threshold, bool use_cache)
     : reindex_threshold_(reindex_threshold),
+      use_cache_(use_cache),
       shutdown_(false)
 {
     std::vector<std::string> table_names = []() {
@@ -192,23 +193,25 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
         return hash;
     }();
 
-    std::optional<Cache::CacheEntry> cache_entry = cache_map_[table_name]->Get(hash_key);
-    if (cache_entry.has_value()) {
-        metrics_map_[table_name].cache_hit++;
-        return [&]() {
-            std::vector<std::vector<VectorStore::Data>> results;
-            results.reserve(cache_entry->data.size());
-            for (const auto& group : cache_entry->data) {
-                std::vector<VectorStore::Data> result_group;
-                for (const auto& data : group) {
-                    result_group.emplace_back(VectorStore::Data{data.id, data.vector, data.content});
+    if (use_cache_) {
+        std::optional<Cache::CacheEntry> cache_entry = cache_map_[table_name]->Get(hash_key);
+        if (cache_entry.has_value()) {
+            metrics_map_[table_name].cache_hit++;
+            return [&]() {
+                std::vector<std::vector<VectorStore::Data>> results;
+                results.reserve(cache_entry->data.size());
+                for (const auto& group : cache_entry->data) {
+                    std::vector<VectorStore::Data> result_group;
+                    for (const auto& data : group) {
+                        result_group.emplace_back(VectorStore::Data{data.id, data.vector, data.content});
+                    }
+                    results.emplace_back(std::move(result_group));
                 }
-                results.emplace_back(std::move(result_group));
-            }
-            return results;
-        }();
+                return results;
+            }();
+        }
+        metrics_map_[table_name].cache_miss++;
     }
-    metrics_map_[table_name].cache_miss++;
 
     std::vector<std::future<std::vector<VectorStore::Data>>> futures;
     for (const auto& [query, k, search_param] : requests) {
@@ -231,20 +234,22 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
         results.push_back(data_vector.get());
     }
 
-    Cache::CacheEntry new_entry = [&]() {
-        Cache::CacheEntry entry;
-        entry.data.reserve(results.size());
-        for (const auto& result_group : results) {
-            std::vector<Cache::CacheEntry::Data> data_group;
-            data_group.reserve(result_group.size());
-            for (const auto& data : result_group) {
-                data_group.emplace_back(Cache::CacheEntry::Data{data.id, data.vector, data.content});
+    if (use_cache_) {
+        Cache::CacheEntry new_entry = [&]() {
+            Cache::CacheEntry entry;
+            entry.data.reserve(results.size());
+            for (const auto& result_group : results) {
+                std::vector<Cache::CacheEntry::Data> data_group;
+                data_group.reserve(result_group.size());
+                for (const auto& data : result_group) {
+                    data_group.emplace_back(Cache::CacheEntry::Data{data.id, data.vector, data.content});
+                }
+                entry.data.emplace_back(data_group);
             }
-            entry.data.emplace_back(data_group);
-        }
-        return entry;
-    }();
-    cache_map_[table_name]->Store(hash_key, new_entry);
+            return entry;
+        }();
+        cache_map_[table_name]->Store(hash_key, new_entry);
+    }
 
     return results;
 }

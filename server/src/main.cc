@@ -34,8 +34,9 @@ int main(int argc, char* argv[]) {
     std::string server_address = "0.0.0.0:50051";
 
     float reindex_threshold = 0.25;
+    bool use_cache = true;
 
-    auto engine = std::make_unique<vector_db_engine::Engine>(reindex_threshold);
+    auto engine = std::make_unique<vector_db_engine::Engine>(reindex_threshold, use_cache);
 
     VectorDatabaseServiceImpl vector_db_service(std::move(engine));
 
