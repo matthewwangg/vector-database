@@ -21,6 +21,11 @@ namespace vector_db_engine {
 
 class Engine {
 public:
+    struct Metadata {
+        bool primary;
+        std::string primary_address;
+    };
+
     struct Stats {
         uint64_t vector_count = 0;
         uint64_t deleted_count = 0;
@@ -42,7 +47,7 @@ public:
         uint64_t cache_miss = 0;
     };
 
-    explicit Engine(float reindex_threshold, bool use_cache);
+    explicit Engine(bool primary, float reindex_threshold, bool use_cache, std::string primary_address = "");
     ~Engine();
 
     bool Insert(std::string table_name, Id id, const Vector& vector, const std::string& content);
@@ -63,10 +68,7 @@ public:
     void Cleanup(const std::string& table_name, bool force);
 
 private:
-    std::unique_ptr<VectorStore> store_;
-    std::unique_ptr<VectorPersistenceManager> persistence_manager_;
-    Stats stats_;
-    Metrics metrics_;
+    Metadata metadata_;
 
     std::unordered_map<std::string, std::unique_ptr<VectorStore>> store_map_;
     std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>> persistence_manager_map_;
