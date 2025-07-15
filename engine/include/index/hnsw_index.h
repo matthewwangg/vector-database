@@ -59,7 +59,7 @@ private:
 
     float ComputeDistance(const Vector& a, const Vector& b) const;
     void ConnectNeighbors(Id node_id, const Vector& vector, const std::vector<Id>& neighbors, int level);
-    int GetRandomLevel() const;
+    int GetRandomLevel(Id id) const;
 
     std::unordered_map<Id, Node> nodes_;
     std::unordered_map<int, std::unordered_set<Id>> node_levels_;
