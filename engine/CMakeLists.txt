@@ -18,6 +18,7 @@ target_include_directories(engine PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include/storage
         ${CMAKE_CURRENT_SOURCE_DIR}/include/util
         ${CMAKE_CURRENT_SOURCE_DIR}/include/cache
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/replica
         ${CMAKE_CURRENT_SOURCE_DIR}/proto
 )
 

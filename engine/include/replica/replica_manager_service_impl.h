@@ -9,14 +9,18 @@
 
 #include "replica.grpc.pb.h"
 
+namespace vector_db_engine {
+
 class ReplicaManagerServiceImpl : public vector_db::ReplicaManager::Service {
 public:
-    explicit ReplicaManagerServiceImpl(std::unique_ptr<vector_db_engine::Engine>);
+    explicit ReplicaManagerServiceImpl(Engine* engine);
 
     grpc::Status Sync(grpc::ServerContext* context, const vector_db::SyncRequest* request, vector_db::SyncResponse* response) override;
 
 private:
-    std::unique_ptr<vector_db_engine::Engine> engine_;
+    Engine* engine_;
 };
+
+} // namespace vector_db_engine
 
 #endif //VECTOR_DATABASE_REPLICA_MANAGER_SERVICE_IMPL_H

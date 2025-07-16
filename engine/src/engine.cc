@@ -16,13 +16,14 @@
 #include "thread_pool.h"
 #include "vector_store.h"
 
+#include "replica_manager_service_impl.h"
 #include "replica.grpc.pb.h"
 #include "replica.pb.h"
 
 namespace vector_db_engine {
 
 constexpr int kCleanupInterval = 60;
-constexpr int kSyncInterval = 120;
+constexpr int kSyncInterval = 90;
 
 
 inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
@@ -77,7 +78,7 @@ Engine::Engine(bool primary, float reindex_threshold, bool use_cache, std::strin
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
     if (metadata_.primary && !replicas.empty()) {
         sync_thread_ = std::thread(&Engine::BackgroundSyncReplicasLoop, this);
-    } else {
+    } else if (!metadata_.primary) {
         sync_thread_ = std::thread(&Engine::BackgroundWaitForSyncLoop, this);
     }
 }
@@ -455,7 +456,7 @@ void Engine::Sync(bool force) {
 void Engine::BackgroundWaitForSyncLoop() {
     std::string server_address = "0.0.0.0:50052";
 
-    ReplicaManagerServiceImpl replica_manager_service(shared_from_this());
+    ReplicaManagerServiceImpl replica_manager_service(this);
 
     grpc::ServerBuilder builder;
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
