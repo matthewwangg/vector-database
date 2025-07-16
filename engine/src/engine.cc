@@ -10,13 +10,20 @@
 #include <thread>
 #include <vector>
 
+#include <grpcpp/grpcpp.h>
+
 #include "hnsw_index.h"
 #include "thread_pool.h"
 #include "vector_store.h"
 
+#include "replica.grpc.pb.h"
+#include "replica.pb.h"
+
 namespace vector_db_engine {
 
 constexpr int kCleanupInterval = 60;
+constexpr int kSyncInterval = 120;
+
 
 inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
@@ -91,6 +98,7 @@ Engine::~Engine() {
             continue;
         }
         Cleanup(table, true);
+        Sync(true);
         persistence_manager_map_[table]->SaveSnapshot(*store);
         persistence_manager_map_[table]->ClearWAL();
     }
@@ -321,6 +329,7 @@ bool Engine::CreateTable(std::string name) {
     metrics_map_[name] = {};
     removed_flag_map_[name] = false;
     cache_map_[name] = std::move(lru_cache);
+    replica_wal_offsets_map_[name] = 0;
 
     return true;
 }
@@ -343,6 +352,7 @@ bool Engine::DropTable(std::string name) {
     metrics_map_.erase(name);
     removed_flag_map_.erase(name);
     cache_map_.erase(name);
+    replica_wal_offsets_map_.erase(name);
 
     return true;
 }
@@ -370,6 +380,7 @@ void Engine::BackgroundCleanupLoop() {
 }
 
 void Engine::Cleanup(const std::string& table_name, bool force) {
+    std::shared_lock lock(engine_mutex_);
     if ((shutdown_ && !force) || (!store_map_.contains(table_name)|| !stats_map_.contains(table_name) || !metrics_map_.contains(table_name))) {
         return;
     }
@@ -394,20 +405,86 @@ void Engine::Cleanup(const std::string& table_name, bool force) {
 }
 
 void Engine::BackgroundSyncReplicasLoop() {
+    std::unique_lock<std::mutex> lock(sync_mutex_);
     while (!shutdown_) {
+        sync_cv_.wait_for(lock, std::chrono::seconds(kSyncInterval));
+
+        if (shutdown_) {
+            break;
+        }
+
+        auto start = std::chrono::steady_clock::now();
         Sync(false);
-    }
-}
-
-void Engine::BackgroundWaitForSyncLoop() {
-    while (!shutdown_) {
-
+        auto end = std::chrono::steady_clock::now();
+        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        std::cout << "sync completed in " << duration_ms << " ms\n";
     }
 }
 
 void Engine::Sync(bool force) {
+    std::shared_lock lock(engine_mutex_);
     if ((shutdown_ && !force)) {
         return;
+    }
+
+    for (const auto& [table, persistence_manager] : persistence_manager_map_) {
+        vector_db::SyncRequest request;
+        std::vector<vector_db::WALEntry> entries = persistence_manager_map_[table]->SerializeWALEntries(replica_wal_offsets_map_[table]);
+        if (entries.empty()) {
+            continue;
+        }
+
+        for (const auto& entry : entries) {
+            *request.add_entry() = entry;
+        }
+
+        for (const auto& replica : replicas_) {
+            auto stub = vector_db::ReplicaManager::NewStub(grpc::CreateChannel(replica, grpc::InsecureChannelCredentials()));
+            vector_db::SyncResponse response;
+            grpc::ClientContext context;
+            grpc::Status status = stub->Sync(&context, request, &response);
+            if (!status.ok()) {
+                std::cout << "error in updating replica: " << replica << std::endl;
+            }
+        }
+
+        replica_wal_offsets_map_[table] += entries.size();
+    }
+}
+
+void Engine::BackgroundWaitForSyncLoop() {
+    std::string server_address = "0.0.0.0:50052";
+
+    ReplicaManagerServiceImpl replica_manager_service(shared_from_this());
+
+    grpc::ServerBuilder builder;
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    builder.RegisterService(&replica_manager_service);
+
+    std::cout << "replica sync server running on " << server_address << std::endl;
+    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
+
+    server->Wait();
+}
+
+void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
+    std::shared_lock lock(engine_mutex_);
+    if (!store_map_.contains(entry.table()) || !stats_map_.contains(entry.table()) || !removed_flag_map_.contains(entry.table())) {
+        return;
+    }
+    if (entry.type() == vector_db::WALEntry::INSERT) {
+        Vector vector(entry.vector().begin(), entry.vector().end());
+        bool ok = store_map_[entry.table()]->Insert(entry.id(), vector, entry.content());
+        if (ok) {
+            stats_map_[entry.table()].vector_count++;
+        }
+    } else {
+        bool ok = store_map_[entry.table()]->Remove(entry.id());
+        if (ok) {
+            removed_flag_map_[entry.table()] = true;
+            stats_map_[entry.table()].deleted_count++;
+            stats_map_[entry.table()].stale_count++;
+        }
     }
 }
 

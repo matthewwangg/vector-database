@@ -6,10 +6,12 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "hnsw_index.h"
 #include "vector_store.h"
 
+#include "replica.pb.h"
 #include "storage.pb.h"
 
 namespace vector_db_engine {
@@ -267,6 +269,10 @@ void VectorPersistenceManager::Clear() {
     std::filesystem::remove(store_snapshot_file_path_);
     std::filesystem::remove(index_snapshot_file_path_);
     std::filesystem::remove(wal_file_path_);
+}
+
+std::vector<vector_db::WALEntry> SerializeWALEntries(int offset) {
+    return {};
 }
 
 std::string VectorPersistenceManager::GetFullFilepath(std::string file_path) {

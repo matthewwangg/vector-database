@@ -17,6 +17,8 @@
 #include "thread_pool.h"
 #include "vector_store.h"
 
+#include "replica.pb.h"
+
 namespace vector_db_engine {
 
 class Engine {
@@ -68,14 +70,17 @@ public:
     void Cleanup(const std::string& table_name, bool force);
 
     void BackgroundSyncReplicasLoop();
-    void BackgroundWaitForSyncLoop();
     void Sync(bool force);
+
+    void BackgroundWaitForSyncLoop();
+    void ApplyWALEntry(const vector_db::WALEntry& entry);
 
 private:
     Metadata metadata_;
     std::atomic<bool> shutdown_;
 
     std::vector<std::string> replicas_;
+    std::unordered_map<std::string, uint64_t> replica_wal_offsets_map_;
 
     std::unordered_map<std::string, std::unique_ptr<VectorStore>> store_map_;
     std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>> persistence_manager_map_;
@@ -97,6 +102,7 @@ private:
     std::mutex cleanup_mutex_;
 
     std::thread sync_thread_;
+    std::condition_variable sync_cv_;
     std::mutex sync_mutex_;
 };
 
