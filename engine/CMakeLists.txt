@@ -5,6 +5,7 @@ add_library(engine
         src/storage/persistence_manager.cc
         src/util/thread_pool.cc
         src/cache/lru_cache.cc
+        src/replica/replica_manager_service_impl.cc
         proto/storage.pb.cc
         proto/replica.pb.cc
         proto/replica.grpc.pb.cc
@@ -18,4 +19,10 @@ target_include_directories(engine PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include/util
         ${CMAKE_CURRENT_SOURCE_DIR}/include/cache
         ${CMAKE_CURRENT_SOURCE_DIR}/proto
+)
+
+target_link_libraries(engine PRIVATE
+        grpc++
+        grpc
+        protobuf
 )
