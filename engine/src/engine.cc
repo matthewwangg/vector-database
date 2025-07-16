@@ -335,6 +335,44 @@ bool Engine::CreateTable(std::string name) {
     return true;
 }
 
+bool Engine::CreateTableWithoutLock(std::string name) {
+    if (shutdown_ || name.empty()) {
+        return false;
+    }
+
+    if (store_map_.contains(name) || persistence_manager_map_.contains(name) || stats_map_.contains(name) || metrics_map_.contains(name) || removed_flag_map_.contains(name) || cache_map_.contains(name)) {
+        return false;
+    }
+
+    std::size_t m = 16;
+    std::size_t m0 = 32;
+    std::size_t ef_construction = 64;
+    float ml = 1.0f;
+    int vector_dimensionality = 384;
+    auto distance_metric = vector_db_engine::HNSWIndex::DistanceMetric::L2;
+
+    std::size_t cache_size = 32;
+
+    std::string store_snapshot = name + "_" + kStoreSnapshotFilename;
+    std::string index_snapshot = name + "_" + kIndexSnapshotFilename;
+    std::string write_ahead_log = name + "_" + kWriteAheadLogFilename;
+
+    auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality);
+    auto vector_store = std::make_unique<VectorStore>(std::move(hnsw_index), vector_dimensionality);
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>(store_snapshot, index_snapshot, write_ahead_log);
+    auto lru_cache = std::make_unique<LRUCache>(cache_size);
+
+    store_map_[name] = std::move(vector_store);
+    persistence_manager_map_[name] = std::move(persistence_manager);
+    stats_map_[name] = {};
+    metrics_map_[name] = {};
+    removed_flag_map_[name] = false;
+    cache_map_[name] = std::move(lru_cache);
+    replica_wal_offsets_map_[name] = 0;
+
+    return true;
+}
+
 bool Engine::DropTable(std::string name) {
     std::unique_lock lock(engine_mutex_);
     if (!metadata_.primary || shutdown_ || name.empty()) {
@@ -469,9 +507,12 @@ void Engine::BackgroundWaitForSyncLoop() {
 }
 
 void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
-    std::shared_lock lock(engine_mutex_);
+    std::unique_lock lock(engine_mutex_);
     if (!store_map_.contains(entry.table()) || !stats_map_.contains(entry.table()) || !removed_flag_map_.contains(entry.table())) {
-        return;
+        bool ok = CreateTableWithoutLock(entry.table());
+        if (!ok) {
+            return;
+        }
     }
     if (entry.type() == vector_db::WALEntry::INSERT) {
         Vector vector(entry.vector().begin(), entry.vector().end());

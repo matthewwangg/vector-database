@@ -238,6 +238,9 @@ void VectorPersistenceManager::ReplayWAL(VectorStore& store) {
 
             std::string content;
             std::getline(stream, content);
+            if (content.starts_with("| ")) {
+                content = content.substr(2);
+            }
             store.Insert(id, vector, content);
         }
         if (command == "remove") {
@@ -318,8 +321,12 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(i
 
             std::string content;
             std::getline(stream, content);
+            if (content.starts_with("| ")) {
+                content = content.substr(2);
+            }
             entry.set_content(content);
-        } else if (command == "remove") {
+        }
+        if (command == "remove") {
             entry.set_type(vector_db::WALEntry::REMOVE);
         }
 
