@@ -399,7 +399,7 @@ void HNSWIndex::ConnectNeighbors(Id node_id, const Vector& vector, const std::ve
 }
 
 int HNSWIndex::GetRandomLevel(Id id) const {
-    std::mt19337 random_engine(std::hash<Id>{}(id));
+    std::mt19937 random_engine(std::hash<Id>{}(id));
     return static_cast<int>(-std::log(1.0 - level_distribution_(random_engine)) * ml_);
 }
 

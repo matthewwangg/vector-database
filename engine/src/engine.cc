@@ -30,7 +30,7 @@ Engine::Engine(bool primary, float reindex_threshold, bool use_cache, std::strin
 {
     metadata_ = Metadata{
         .primary = primary,
-        .primary_address = primary_addres
+        .primary_address = primary_address
     };
 
     std::vector<std::string> table_names = []() {
@@ -68,10 +68,19 @@ Engine::Engine(bool primary, float reindex_threshold, bool use_cache, std::strin
 
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
+    if (metadata_.primary && !replicas.empty()) {
+        sync_thread_ = std::thread(&Engine::BackgroundSyncReplicasLoop, this);
+    } else {
+        sync_thread_ = std::thread(&Engine::BackgroundWaitForSyncLoop, this);
+    }
 }
 
 Engine::~Engine() {
     shutdown_ = true;
+    if (sync_thread_.joinable()) {
+        sync_thread_.join();
+    }
+
     cleanup_cv_.notify_one();
     if (cleanup_thread_.joinable()) {
         cleanup_thread_.join();
@@ -381,6 +390,24 @@ void Engine::Cleanup(const std::string& table_name, bool force) {
     if (reindex) {
         metrics_map_[table_name].reindex_count++;
         stats_map_[table_name].stale_count = 0;
+    }
+}
+
+void Engine::BackgroundSyncReplicasLoop() {
+    while (!shutdown_) {
+        Sync(false);
+    }
+}
+
+void Engine::BackgroundWaitForSyncLoop() {
+    while (!shutdown_) {
+
+    }
+}
+
+void Engine::Sync(bool force) {
+    if ((shutdown_ && !force)) {
+        return;
     }
 }
 

@@ -67,8 +67,13 @@ public:
     void BackgroundCleanupLoop();
     void Cleanup(const std::string& table_name, bool force);
 
+    void BackgroundSyncReplicasLoop();
+    void BackgroundWaitForSyncLoop();
+    void Sync(bool force);
+
 private:
     Metadata metadata_;
+    std::atomic<bool> shutdown_;
 
     std::vector<std::string> replicas_;
 
@@ -87,10 +92,12 @@ private:
     std::unique_ptr<ThreadPool> thread_pool_;
 
     std::thread cleanup_thread_;
-    std::atomic<bool> shutdown_;
     std::atomic<bool> removed_;
     std::condition_variable cleanup_cv_;
     std::mutex cleanup_mutex_;
+
+    std::thread sync_thread_;
+    std::mutex sync_mutex_;
 };
 
 } // namespace vector_db_engine
