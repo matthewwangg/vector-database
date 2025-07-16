@@ -6,6 +6,8 @@ add_library(engine
         src/util/thread_pool.cc
         src/cache/lru_cache.cc
         proto/storage.pb.cc
+        proto/replica.pb.cc
+        proto/replica.grpc.pb.cc
 )
 
 target_include_directories(engine PUBLIC

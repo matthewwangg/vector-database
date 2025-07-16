@@ -33,10 +33,11 @@ int main(int argc, char* argv[]) {
 
     std::string server_address = "0.0.0.0:50051";
 
+    bool primary = true;
     float reindex_threshold = 0.25;
     bool use_cache = true;
 
-    auto engine = std::make_unique<vector_db_engine::Engine>(reindex_threshold, use_cache);
+    auto engine = std::make_unique<vector_db_engine::Engine>(primary, reindex_threshold, use_cache);
 
     VectorDatabaseServiceImpl vector_db_service(std::move(engine));
 
