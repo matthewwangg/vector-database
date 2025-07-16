@@ -22,9 +22,10 @@ inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
 inline const std::string kWriteAheadLogFilename = "wal.log";
 
-Engine::Engine(bool primary, float reindex_threshold, bool use_cache, std::string primary_address)
+Engine::Engine(bool primary, float reindex_threshold, bool use_cache, std::string primary_address, std::vector<std::string> replicas)
     : reindex_threshold_(reindex_threshold),
       use_cache_(use_cache),
+      replicas_(replicas),
       shutdown_(false)
 {
     metadata_ = Metadata{

@@ -47,7 +47,7 @@ public:
         uint64_t cache_miss = 0;
     };
 
-    explicit Engine(bool primary, float reindex_threshold, bool use_cache, std::string primary_address = "");
+    explicit Engine(bool primary, float reindex_threshold, bool use_cache, std::string primary_address = "", std::vector<std::string> replicas = {});
     ~Engine();
 
     bool Insert(std::string table_name, Id id, const Vector& vector, const std::string& content);
@@ -69,6 +69,8 @@ public:
 
 private:
     Metadata metadata_;
+
+    std::vector<std::string> replicas_;
 
     std::unordered_map<std::string, std::unique_ptr<VectorStore>> store_map_;
     std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>> persistence_manager_map_;
