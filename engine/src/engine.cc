@@ -24,7 +24,7 @@ namespace vector_db_engine {
 
 constexpr int kCleanupInterval = 60;
 constexpr int kSyncInterval = 90;
-
+constexpr int kShutdownCheckInterval = 1000;
 
 inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
@@ -538,7 +538,16 @@ void Engine::BackgroundWaitForSyncLoop() {
     std::cout << "replica sync server running on " << metadata_.sync_server_address << std::endl;
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
+    std::thread shutdown_thread([&server, this]() {
+        while (!shutdown_) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(kShutdownCheckInterval));
+        }
+        std::cout << "replica sync server shutting down..." << std::endl;
+        server->Shutdown();
+    });
+
     server->Wait();
+    shutdown_thread.join();
 }
 
 void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
