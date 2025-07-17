@@ -4,6 +4,7 @@ package vector_db;
 
 service ReplicaManager {
   rpc Sync(SyncRequest) returns (SyncResponse);
+  rpc Drop(DropRequest) returns (DropResponse);
 }
 
 message SyncRequest {
@@ -24,3 +25,9 @@ message WALEntry {
   repeated float vector = 4;
   string content = 5;
 }
+
+message DropRequest {
+  string table = 1;
+}
+
+message DropResponse {}

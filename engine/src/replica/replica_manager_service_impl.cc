@@ -18,4 +18,9 @@ grpc::Status ReplicaManagerServiceImpl::Sync(grpc::ServerContext* context, const
     return grpc::Status::OK;
 }
 
+grpc::Status ReplicaManagerServiceImpl::Drop(grpc::ServerContext* context, const vector_db::DropRequest* request, vector_db::DropResponse* response) {
+    engine_->DropTableWithoutLock(request->table());
+    return grpc::Status::OK;
+}
+
 } // namespace vector_db_engine

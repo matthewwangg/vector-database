@@ -393,6 +393,37 @@ bool Engine::DropTable(std::string name) {
     cache_map_.erase(name);
     replica_wal_offsets_map_.erase(name);
 
+    vector_db::DropRequest request;
+    request.set_table(name);
+    for (const auto& replica : replicas_) {
+        auto stub = vector_db::ReplicaManager::NewStub(grpc::CreateChannel(replica, grpc::InsecureChannelCredentials()));
+        vector_db::DropResponse response;
+        grpc::ClientContext context;
+        grpc::Status status = stub->Drop(&context, request, &response);
+    }
+
+    return true;
+}
+
+bool Engine::DropTableWithoutLock(std::string name) {
+    if (shutdown_ || name.empty()) {
+        return false;
+    }
+
+    if (!store_map_.contains(name) || !persistence_manager_map_.contains(name) || !stats_map_.contains(name) || !metrics_map_.contains(name) || !removed_flag_map_.contains(name) || !cache_map_.contains(name)) {
+        return false;
+    }
+
+    persistence_manager_map_[name]->Clear();
+
+    store_map_.erase(name);
+    persistence_manager_map_.erase(name);
+    stats_map_.erase(name);
+    metrics_map_.erase(name);
+    removed_flag_map_.erase(name);
+    cache_map_.erase(name);
+    replica_wal_offsets_map_.erase(name);
+
     return true;
 }
 
@@ -520,7 +551,8 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
         if (ok) {
             stats_map_[entry.table()].vector_count++;
         }
-    } else {
+    }
+    if (entry.type() == vector_db::WALEntry::REMOVE) {
         bool ok = store_map_[entry.table()]->Remove(entry.id());
         if (ok) {
             removed_flag_map_[entry.table()] = true;

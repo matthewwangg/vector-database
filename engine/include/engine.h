@@ -66,6 +66,7 @@ public:
     bool CreateTable(std::string name);
     bool CreateTableWithoutLock(std::string name);
     bool DropTable(std::string name);
+    bool DropTableWithoutLock(std::string name);
 
     void BackgroundCleanupLoop();
     void Cleanup(const std::string& table_name, bool force);
