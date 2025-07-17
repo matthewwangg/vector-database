@@ -6,10 +6,12 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "hnsw_index.h"
 #include "vector_store.h"
 
+#include "replica.pb.h"
 #include "storage.pb.h"
 
 namespace vector_db_engine {
@@ -236,6 +238,9 @@ void VectorPersistenceManager::ReplayWAL(VectorStore& store) {
 
             std::string content;
             std::getline(stream, content);
+            if (content.starts_with("| ")) {
+                content = content.substr(2);
+            }
             store.Insert(id, vector, content);
         }
         if (command == "remove") {
@@ -267,6 +272,69 @@ void VectorPersistenceManager::Clear() {
     std::filesystem::remove(store_snapshot_file_path_);
     std::filesystem::remove(index_snapshot_file_path_);
     std::filesystem::remove(wal_file_path_);
+}
+
+std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(int offset) {
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+
+    std::vector<vector_db::WALEntry> entries;
+
+    std::ifstream wal_in(wal_file_path_);
+    if (!wal_in) {
+        return {};
+    }
+
+    std::string line;
+    int current_line = 0;
+    while (std::getline(wal_in, line)) {
+        if (current_line < offset) {
+            current_line++;
+            continue;
+        }
+
+        vector_db::WALEntry entry;
+        entry.set_table(table_name_);
+
+        std::istringstream stream(line);
+        std::string command;
+        stream >> command;
+
+        Id id;
+        stream >> id;
+        entry.set_id(id);
+
+        if (command == "insert") {
+            entry.set_type(vector_db::WALEntry::INSERT);
+
+            Vector vector;
+            float value;
+            while (stream >> value)  {
+                vector.push_back(value);
+            }
+
+            for (float value : vector) {
+                entry.add_vector(value);
+            }
+
+            stream.clear();
+            stream >> std::ws;
+
+            std::string content;
+            std::getline(stream, content);
+            if (content.starts_with("| ")) {
+                content = content.substr(2);
+            }
+            entry.set_content(content);
+        }
+        if (command == "remove") {
+            entry.set_type(vector_db::WALEntry::REMOVE);
+        }
+
+        entries.push_back(entry);
+        current_line++;
+    }
+
+    return entries;
 }
 
 std::string VectorPersistenceManager::GetFullFilepath(std::string file_path) {

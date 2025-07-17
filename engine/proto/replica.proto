@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package vector_db;
+
+service ReplicaManager {
+  rpc Sync(SyncRequest) returns (SyncResponse);
+  rpc Drop(DropRequest) returns (DropResponse);
+}
+
+message SyncRequest {
+  repeated WALEntry entry = 1;
+}
+
+message SyncResponse {}
+
+message WALEntry {
+  enum Type {
+    INSERT = 0;
+    REMOVE = 1;
+  }
+
+  Type type = 1;
+  string table = 2;
+  uint64 id = 3;
+  repeated float vector = 4;
+  string content = 5;
+}
+
+message DropRequest {
+  string table = 1;
+}
+
+message DropResponse {}

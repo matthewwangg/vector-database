@@ -17,10 +17,17 @@
 #include "thread_pool.h"
 #include "vector_store.h"
 
+#include "replica.pb.h"
+
 namespace vector_db_engine {
 
 class Engine {
 public:
+    struct Metadata {
+        bool primary;
+        std::string primary_address;
+    };
+
     struct Stats {
         uint64_t vector_count = 0;
         uint64_t deleted_count = 0;
@@ -42,7 +49,7 @@ public:
         uint64_t cache_miss = 0;
     };
 
-    explicit Engine(float reindex_threshold, bool use_cache);
+    explicit Engine(bool primary, float reindex_threshold, bool use_cache, std::string primary_address = "", std::vector<std::string> replicas = {});
     ~Engine();
 
     bool Insert(std::string table_name, Id id, const Vector& vector, const std::string& content);
@@ -57,16 +64,25 @@ public:
     Metrics GetMetrics(std::string table_name);
 
     bool CreateTable(std::string name);
+    bool CreateTableWithoutLock(std::string name);
     bool DropTable(std::string name);
+    bool DropTableWithoutLock(std::string name);
 
     void BackgroundCleanupLoop();
     void Cleanup(const std::string& table_name, bool force);
 
+    void BackgroundSyncReplicasLoop();
+    void Sync(bool force);
+
+    void BackgroundWaitForSyncLoop();
+    void ApplyWALEntry(const vector_db::WALEntry& entry);
+
 private:
-    std::unique_ptr<VectorStore> store_;
-    std::unique_ptr<VectorPersistenceManager> persistence_manager_;
-    Stats stats_;
-    Metrics metrics_;
+    Metadata metadata_;
+    std::atomic<bool> shutdown_;
+
+    std::vector<std::string> replicas_;
+    std::unordered_map<std::string, uint64_t> replica_wal_offsets_map_;
 
     std::unordered_map<std::string, std::unique_ptr<VectorStore>> store_map_;
     std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>> persistence_manager_map_;
@@ -83,10 +99,13 @@ private:
     std::unique_ptr<ThreadPool> thread_pool_;
 
     std::thread cleanup_thread_;
-    std::atomic<bool> shutdown_;
     std::atomic<bool> removed_;
     std::condition_variable cleanup_cv_;
     std::mutex cleanup_mutex_;
+
+    std::thread sync_thread_;
+    std::condition_variable sync_cv_;
+    std::mutex sync_mutex_;
 };
 
 } // namespace vector_db_engine

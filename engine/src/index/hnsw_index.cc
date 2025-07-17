@@ -56,7 +56,7 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
         return;
     }
 
-    int new_level = GetRandomLevel();
+    int new_level = GetRandomLevel(id);
 
     nodes_[id] = Node{
             .vector = vector,
@@ -288,7 +288,7 @@ void HNSWIndex::InsertNoLock(Id id, const Vector& vector) {
         return;
     }
 
-    int new_level = GetRandomLevel();
+    int new_level = GetRandomLevel(id);
 
     nodes_[id] = Node{
             .vector = vector,
@@ -398,8 +398,9 @@ void HNSWIndex::ConnectNeighbors(Id node_id, const Vector& vector, const std::ve
     }
 }
 
-int HNSWIndex::GetRandomLevel() const {
-    return static_cast<int>(-std::log(1.0 - level_distribution_(random_engine_)) * ml_);
+int HNSWIndex::GetRandomLevel(Id id) const {
+    std::mt19937 random_engine(std::hash<Id>{}(id));
+    return static_cast<int>(-std::log(1.0 - level_distribution_(random_engine)) * ml_);
 }
 
 } // namespace vector_db_engine

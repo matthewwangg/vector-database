@@ -10,6 +10,8 @@
 
 #include "vector_store.h"
 
+#include "replica.pb.h"
+
 namespace vector_db_engine {
 
 using Id = std::uint64_t;
@@ -27,6 +29,8 @@ public:
     void ReplayWAL(VectorStore& store);
     void ClearWAL();
     void Clear();
+
+    std::vector<vector_db::WALEntry> SerializeWALEntries(int offset);
 
 private:
     std::string GetFullFilepath(std::string file_path);
