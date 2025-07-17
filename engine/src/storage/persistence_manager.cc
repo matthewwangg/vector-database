@@ -16,12 +16,13 @@
 
 namespace vector_db_engine {
 
-VectorPersistenceManager::VectorPersistenceManager(std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path)
-    : store_snapshot_file_path_(GetFullFilepath(store_snapshot_file_path)),
+VectorPersistenceManager::VectorPersistenceManager(std::string name, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path)
+    : name_(name),
+      store_snapshot_file_path_(GetFullFilepath(store_snapshot_file_path)),
       index_snapshot_file_path_(GetFullFilepath(index_snapshot_file_path)),
       wal_file_path_(GetFullFilepath(wal_file_path))
 {
-    const std::string base = std::string(std::getenv("HOME")) + "/.vector_db/";
+    const std::string base = std::string(std::getenv("HOME")) + "/.vector_db/" + name_ + "/";
     const std::string suffix = "_wal.log";
     table_name_ = wal_file_path_.substr(base.size(), wal_file_path_.size() - base.size() - suffix.size());
 
@@ -343,9 +344,9 @@ std::string VectorPersistenceManager::GetFullFilepath(std::string file_path) {
         return file_path;
     }
 
-    std::filesystem::create_directories(std::filesystem::path(home) / ".vector_db");
+    std::filesystem::create_directories(std::filesystem::path(home) / ".vector_db" / name_);
 
-    return std::string(home) + "/.vector_db/" + file_path;
+    return std::string(home) + "/.vector_db/" + name_ + "/" + file_path;
 }
 
 } // namespace vector_db_engine

@@ -30,22 +30,23 @@ inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
 inline const std::string kWriteAheadLogFilename = "wal.log";
 
-Engine::Engine(bool primary, float reindex_threshold, bool use_cache, std::string sync_server_address, std::vector<std::string> replicas)
+Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string sync_server_address, std::vector<std::string> replicas)
     : reindex_threshold_(reindex_threshold),
       use_cache_(use_cache),
       replicas_(replicas),
       shutdown_(false)
 {
     metadata_ = Metadata{
+        .name = name,
         .primary = primary,
         .sync_server_address = sync_server_address
     };
 
-    std::vector<std::string> table_names = []() {
+    std::vector<std::string> table_names = [&]() {
         std::vector<std::string> tables;
         const std::string suffix = "_" + kWriteAheadLogFilename;
 
-        const std::string base_directory = std::string(std::getenv("HOME")) + "/.vector_db";
+        const std::string base_directory = std::string(std::getenv("HOME")) + "/.vector_db/" + metadata_.name;
         std::filesystem::create_directories(base_directory);
         for (const auto& entry : std::filesystem::directory_iterator(base_directory)) {
             if (entry.is_regular_file()) {
@@ -321,7 +322,7 @@ bool Engine::CreateTable(std::string name) {
 
     auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality);
     auto vector_store = std::make_unique<VectorStore>(std::move(hnsw_index), vector_dimensionality);
-    auto persistence_manager = std::make_unique<VectorPersistenceManager>(store_snapshot, index_snapshot, write_ahead_log);
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, store_snapshot, index_snapshot, write_ahead_log);
     auto lru_cache = std::make_unique<LRUCache>(cache_size);
 
     store_map_[name] = std::move(vector_store);
@@ -359,7 +360,7 @@ bool Engine::CreateTableWithoutLock(std::string name) {
 
     auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality);
     auto vector_store = std::make_unique<VectorStore>(std::move(hnsw_index), vector_dimensionality);
-    auto persistence_manager = std::make_unique<VectorPersistenceManager>(store_snapshot, index_snapshot, write_ahead_log);
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, store_snapshot, index_snapshot, write_ahead_log);
     auto lru_cache = std::make_unique<LRUCache>(cache_size);
 
     store_map_[name] = std::move(vector_store);

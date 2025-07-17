@@ -32,12 +32,13 @@ int main(int argc, char* argv[]) {
     std::signal(SIGINT, HandleSignals);
     std::signal(SIGTERM, HandleSignals);
 
-    if (argc < 2) {
-        std::cout << "usage: " << argv[0] << " <server-address> [flags]" << std::endl;
+    if (argc < 3) {
+        std::cout << "usage: " << argv[0] << " <name> <server-address> [flags]" << std::endl;
         return 1;
     }
 
-    std::string server_address = argv[1];
+    std::string name = argv[1];
+    std::string server_address = argv[2];
 
     bool primary = true;
     float reindex_threshold = 0.25f;
@@ -45,7 +46,7 @@ int main(int argc, char* argv[]) {
     std::string sync_server_address;
     std::vector<std::string> replicas;
 
-    for (int i = 2; i < argc; ++i) {
+    for (int i = 3; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--replica") {
             primary = false;
@@ -56,12 +57,12 @@ int main(int argc, char* argv[]) {
         } else if  (arg == "--sync-server-address" && argc > i + 1) {
             sync_server_address = argv[++i];
         } else {
-            std::cout << "usage: " << argv[0] << " <server-address> [flags]" << std::endl;
+            std::cout << "usage: " << argv[0] << " <name> <server-address> [flags]" << std::endl;
             return 1;
         }
     }
 
-    auto engine = std::make_unique<vector_db_engine::Engine>(primary, reindex_threshold, use_cache, sync_server_address, replicas);
+    auto engine = std::make_unique<vector_db_engine::Engine>(name, primary, reindex_threshold, use_cache, sync_server_address, replicas);
 
     VectorDatabaseServiceImpl vector_db_service(std::move(engine));
 

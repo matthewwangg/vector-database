@@ -24,6 +24,7 @@ namespace vector_db_engine {
 class Engine {
 public:
     struct Metadata {
+        std::string name;
         bool primary;
         std::string sync_server_address;
     };
@@ -49,7 +50,7 @@ public:
         uint64_t cache_miss = 0;
     };
 
-    explicit Engine(bool primary, float reindex_threshold, bool use_cache, std::string primary_address = "", std::vector<std::string> replicas = {});
+    explicit Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string primary_address = "", std::vector<std::string> replicas = {});
     ~Engine();
 
     bool Insert(std::string table_name, Id id, const Vector& vector, const std::string& content);

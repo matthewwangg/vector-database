@@ -19,7 +19,7 @@ using Vector = std::vector<float>;
 
 class VectorPersistenceManager {
 public:
-    VectorPersistenceManager(std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path);
+    VectorPersistenceManager(std::string name, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path);
 
     void SaveSnapshot(const VectorStore& store) const;
     std::unique_ptr<VectorStore> LoadSnapshot() const;
@@ -35,6 +35,7 @@ public:
 private:
     std::string GetFullFilepath(std::string file_path);
 
+    std::string name_;
     std::string table_name_;
 
     std::string store_snapshot_file_path_;
