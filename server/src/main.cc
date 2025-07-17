@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <grpcpp/grpcpp.h>
 
@@ -31,13 +32,36 @@ int main(int argc, char* argv[]) {
     std::signal(SIGINT, HandleSignals);
     std::signal(SIGTERM, HandleSignals);
 
-    std::string server_address = "0.0.0.0:50051";
+    if (argc < 2) {
+        std::cout << "usage: " << argv[0] << " <server-address> [flags]" << std::endl;
+        return 1;
+    }
+
+    std::string server_address = argv[1];
 
     bool primary = true;
-    float reindex_threshold = 0.25;
+    float reindex_threshold = 0.25f;
     bool use_cache = true;
+    std::string sync_server_address;
+    std::vector<std::string> replicas;
 
-    auto engine = std::make_unique<vector_db_engine::Engine>(primary, reindex_threshold, use_cache);
+    for (int i = 2; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--replica") {
+            primary = false;
+        } else if (arg == "--no-cache") {
+            use_cache = false;
+        } else if (arg == "--replica-address" && argc > i + 1) {
+            replicas.emplace_back(argv[++i]);
+        } else if  (arg == "--sync-server-address" && argc > i + 1) {
+            sync_server_address = argv[++i];
+        } else {
+            std::cout << "usage: " << argv[0] << " <server-address> [flags]" << std::endl;
+            return 1;
+        }
+    }
+
+    auto engine = std::make_unique<vector_db_engine::Engine>(primary, reindex_threshold, use_cache, sync_server_address, replicas);
 
     VectorDatabaseServiceImpl vector_db_service(std::move(engine));
 
@@ -45,7 +69,13 @@ int main(int argc, char* argv[]) {
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
     builder.RegisterService(&vector_db_service);
 
-    std::cout << "server running on " << server_address << std::endl;
+    std::string type_indicator;
+    if (primary) {
+        type_indicator = " as primary";
+    } else {
+        type_indicator = " as replica";
+    }
+    std::cout << "server running on " << server_address << type_indicator << std::endl;
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
     std::thread shutdown_thread([&server]() {

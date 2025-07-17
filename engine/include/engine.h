@@ -25,7 +25,7 @@ class Engine {
 public:
     struct Metadata {
         bool primary;
-        std::string primary_address;
+        std::string sync_server_address;
     };
 
     struct Stats {

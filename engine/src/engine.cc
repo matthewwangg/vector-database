@@ -30,7 +30,7 @@ inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
 inline const std::string kWriteAheadLogFilename = "wal.log";
 
-Engine::Engine(bool primary, float reindex_threshold, bool use_cache, std::string primary_address, std::vector<std::string> replicas)
+Engine::Engine(bool primary, float reindex_threshold, bool use_cache, std::string sync_server_address, std::vector<std::string> replicas)
     : reindex_threshold_(reindex_threshold),
       use_cache_(use_cache),
       replicas_(replicas),
@@ -38,7 +38,7 @@ Engine::Engine(bool primary, float reindex_threshold, bool use_cache, std::strin
 {
     metadata_ = Metadata{
         .primary = primary,
-        .primary_address = primary_address
+        .sync_server_address = sync_server_address
     };
 
     std::vector<std::string> table_names = []() {
@@ -487,7 +487,7 @@ void Engine::BackgroundSyncReplicasLoop() {
         Sync(false);
         auto end = std::chrono::steady_clock::now();
         auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        std::cout << "sync completed in " << duration_ms << " ms\n";
+        std::cout << "sync completed in " << duration_ms << " ms" << std::endl;
     }
 }
 
@@ -523,15 +523,18 @@ void Engine::Sync(bool force) {
 }
 
 void Engine::BackgroundWaitForSyncLoop() {
-    std::string server_address = "0.0.0.0:50052";
+    if (metadata_.sync_server_address.empty()) {
+        std::cout << "no sync server address specified" << std::endl;
+        return;
+    }
 
     ReplicaManagerServiceImpl replica_manager_service(this);
 
     grpc::ServerBuilder builder;
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    builder.AddListeningPort(metadata_.sync_server_address, grpc::InsecureServerCredentials());
     builder.RegisterService(&replica_manager_service);
 
-    std::cout << "replica sync server running on " << server_address << std::endl;
+    std::cout << "replica sync server running on " << metadata_.sync_server_address << std::endl;
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
     server->Wait();
