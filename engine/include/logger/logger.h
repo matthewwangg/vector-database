@@ -10,6 +10,8 @@ public:
     virtual void Info(const std::string& message);
     virtual void Warn(const std::string& message);
     virtual void Error(const std::string& message);
+
+    virtual std::string GetTimestamp();
 };
 
 #endif //VECTOR_DATABASE_LOGGER_H

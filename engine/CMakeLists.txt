@@ -6,6 +6,7 @@ add_library(engine
         src/util/thread_pool.cc
         src/cache/lru_cache.cc
         src/replica/replica_manager_service_impl.cc
+        src/logger/local_logger.cc
         proto/storage.pb.cc
         proto/replica.pb.cc
         proto/replica.grpc.pb.cc
@@ -19,6 +20,7 @@ target_include_directories(engine PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include/util
         ${CMAKE_CURRENT_SOURCE_DIR}/include/cache
         ${CMAKE_CURRENT_SOURCE_DIR}/include/replica
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/logger
         ${CMAKE_CURRENT_SOURCE_DIR}/proto
 )
 
