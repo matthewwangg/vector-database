@@ -7,12 +7,14 @@
 
 class LocalLogger : public Logger {
 public:
-    void Info(const std::string& message);
-    void Warn(const std::string& message);
-    void Error(const std::string& message);
+    LocalLogger() = default;
 
-private:
-    std::string GetTimestamp();
+    void Info(const std::string& message) override;
+    void Warn(const std::string& message) override;
+    void Error(const std::string& message) override;
+
+protected:
+    std::string GetTimestamp() override;
 };
 
 #endif //VECTOR_DATABASE_LOCAL_LOGGER_H

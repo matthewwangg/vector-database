@@ -12,6 +12,7 @@
 
 #include <grpcpp/grpcpp.h>
 
+#include "local_logger.h"
 #include "hnsw_index.h"
 #include "thread_pool.h"
 #include "vector_store.h"
@@ -76,6 +77,8 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     }
 
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
+    logger_ = std::make_unique<LocalLogger>();
+
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
     if (metadata_.primary && !replicas.empty()) {
         sync_thread_ = std::thread(&Engine::BackgroundSyncReplicasLoop, this);

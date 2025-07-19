@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 
 #include "local_logger.h"
@@ -11,7 +12,7 @@ void LocalLogger::Warn(const std::string& message) {
 }
 
 void LocalLogger::Error(const std::string& message) {
-    std::cout << GetTimestamp() << " [ERROR] [vector_database] [127.0.0.1] " message << std::endl;
+    std::cout << GetTimestamp() << " [ERROR] [vector_database] [127.0.0.1] " << message << std::endl;
 }
 
 std::string LocalLogger::GetTimestamp() {
