@@ -13,15 +13,15 @@ RemoteLogger::RemoteLogger(const std::string& logger_address) {
 }
 
 void RemoteLogger::Info(const std::string& message, const std::string& name) {
-    SendLog("INFO", name, message);
+    SendLog("INFO", message, name);
 }
 
 void RemoteLogger::Warn(const std::string& message, const std::string& name) {
-    SendLog("WARNING", name, message);
+    SendLog("WARNING", message, name);
 }
 
 void RemoteLogger::Error(const std::string& message, const std::string& name) {
-    SendLog("ERROR", name, message);
+    SendLog("ERROR", message, name);
 }
 
 void RemoteLogger::SendLog(const std::string& level, const std::string& message, const std::string source) {

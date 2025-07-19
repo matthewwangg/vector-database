@@ -11,6 +11,8 @@ add_library(engine
         proto/storage.pb.cc
         proto/replica.pb.cc
         proto/replica.grpc.pb.cc
+        proto/log.grpc.pb.cc
+        proto/log.pb.cc
 )
 
 target_include_directories(engine PUBLIC

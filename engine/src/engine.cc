@@ -12,8 +12,9 @@
 
 #include <grpcpp/grpcpp.h>
 
-#include "local_logger.h"
 #include "hnsw_index.h"
+#include "local_logger.h"
+#include "remote_logger.h"
 #include "thread_pool.h"
 #include "vector_store.h"
 
