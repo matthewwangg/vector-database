@@ -39,6 +39,9 @@ void RemoteLogger::SendLog(const std::string& level, const std::string& message,
     entry.set_allocated_timestamp(timestamp);
 
     grpc::ClientContext context;
+    const char* api_key = std::getenv("LOG_SERVICE_API_KEY");
+    context.AddMetadata("authorization", api_key);
+
     logging::LogResponse response;
 
     grpc::Status status = stub_->SendLog(&context, entry, &response);
