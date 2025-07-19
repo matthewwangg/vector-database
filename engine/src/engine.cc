@@ -13,6 +13,8 @@
 #include <grpcpp/grpcpp.h>
 
 #include "hnsw_index.h"
+#include "local_logger.h"
+#include "remote_logger.h"
 #include "thread_pool.h"
 #include "vector_store.h"
 
@@ -76,6 +78,8 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     }
 
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
+    logger_ = std::make_unique<LocalLogger>();
+
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
     if (metadata_.primary && !replicas.empty()) {
         sync_thread_ = std::thread(&Engine::BackgroundSyncReplicasLoop, this);
@@ -443,7 +447,7 @@ void Engine::BackgroundCleanupLoop() {
                 Cleanup(table, false);
                 auto end = std::chrono::steady_clock::now();
                 auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-                std::cout << "cleanup completed in " << duration_ms << " ms\n";
+                logger_->Info("cleanup completed in " + std::to_string(duration_ms) + " ms", metadata_.name);
                 removed_flag_map_[table] = false;
             }
         }
@@ -488,7 +492,7 @@ void Engine::BackgroundSyncReplicasLoop() {
         Sync(false);
         auto end = std::chrono::steady_clock::now();
         auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        std::cout << "sync completed in " << duration_ms << " ms" << std::endl;
+        logger_->Info("sync completed in " + std::to_string(duration_ms) + " ms", metadata_.name);
     }
 }
 
@@ -515,7 +519,7 @@ void Engine::Sync(bool force) {
             grpc::ClientContext context;
             grpc::Status status = stub->Sync(&context, request, &response);
             if (!status.ok()) {
-                std::cout << "error in updating replica: " << replica << std::endl;
+                logger_->Error("error in updating replica: " + replica, metadata_.name);
             }
         }
 
@@ -525,7 +529,7 @@ void Engine::Sync(bool force) {
 
 void Engine::BackgroundWaitForSyncLoop() {
     if (metadata_.sync_server_address.empty()) {
-        std::cout << "no sync server address specified" << std::endl;
+        logger_->Warn("no sync server address specified", metadata_.name);
         return;
     }
 
@@ -535,14 +539,14 @@ void Engine::BackgroundWaitForSyncLoop() {
     builder.AddListeningPort(metadata_.sync_server_address, grpc::InsecureServerCredentials());
     builder.RegisterService(&replica_manager_service);
 
-    std::cout << "replica sync server running on " << metadata_.sync_server_address << std::endl;
+    logger_->Info("replica sync server running on " + metadata_.sync_server_address, metadata_.name);
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
     std::thread shutdown_thread([&server, this]() {
         while (!shutdown_) {
             std::this_thread::sleep_for(std::chrono::milliseconds(kShutdownCheckInterval));
         }
-        std::cout << "replica sync server shutting down..." << std::endl;
+        logger_->Info("replica sync server shutting down...", metadata_.name);
         server->Shutdown();
     });
 

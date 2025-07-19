@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "logger.h"
 #include "lru_cache.h"
 #include "persistence_manager.h"
 #include "thread_pool.h"
@@ -98,6 +99,7 @@ private:
     bool use_cache_;
 
     std::unique_ptr<ThreadPool> thread_pool_;
+    std::unique_ptr<Logger> logger_;
 
     std::thread cleanup_thread_;
     std::atomic<bool> removed_;
