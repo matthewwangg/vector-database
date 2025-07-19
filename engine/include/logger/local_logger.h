@@ -13,8 +13,8 @@ public:
     void Warn(const std::string& message, const std::string& name) override;
     void Error(const std::string& message, const std::string& name) override;
 
-protected:
-    std::string GetTimestamp() override;
+private:
+    std::string GetTimestamp();
 };
 
 #endif //VECTOR_DATABASE_LOCAL_LOGGER_H
