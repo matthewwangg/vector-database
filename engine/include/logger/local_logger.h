@@ -11,6 +11,7 @@ public:
     void Warn(const std::string& message);
     void Error(const std::string& message);
 
+private:
     std::string GetTimestamp();
 };
 

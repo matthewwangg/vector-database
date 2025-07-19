@@ -11,6 +11,7 @@ public:
     virtual void Warn(const std::string& message);
     virtual void Error(const std::string& message);
 
+private:
     virtual std::string GetTimestamp();
 };
 
