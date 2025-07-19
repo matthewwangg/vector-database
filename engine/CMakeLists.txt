@@ -7,6 +7,7 @@ add_library(engine
         src/cache/lru_cache.cc
         src/replica/replica_manager_service_impl.cc
         src/logger/local_logger.cc
+        src/logger/remote_logger.cc
         proto/storage.pb.cc
         proto/replica.pb.cc
         proto/replica.grpc.pb.cc
