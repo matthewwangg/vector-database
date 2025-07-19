@@ -1,0 +1,37 @@
+syntax='proto3';
+
+package logging;
+
+import "google/protobuf/timestamp.proto";
+
+message LogEntry {
+  google.protobuf.Timestamp timestamp = 1;
+  string message = 2;
+  string level = 3;
+  string source = 4;
+  string hostname = 5;
+}
+
+message LogResponse {
+  bool success = 1;
+}
+
+message QueryRequest {
+  string source = 1;
+  string date = 2;
+  optional string keyword = 3;
+}
+
+message QueryResponse {
+  repeated LogEntry entries = 1;
+}
+
+service LogService {
+  rpc SendLog(LogEntry) returns (LogResponse);
+
+  rpc StreamLog(stream LogEntry) returns (LogResponse);
+
+  rpc QueryLog(QueryRequest) returns (QueryResponse);
+
+  rpc SubscribeLog(QueryRequest) returns (stream LogEntry);
+}
