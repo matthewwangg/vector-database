@@ -9,9 +9,9 @@ class LocalLogger : public Logger {
 public:
     LocalLogger() = default;
 
-    void Info(const std::string& message) override;
-    void Warn(const std::string& message) override;
-    void Error(const std::string& message) override;
+    void Info(const std::string& message, const std::string& name) override;
+    void Warn(const std::string& message, const std::string& name) override;
+    void Error(const std::string& message, const std::string& name) override;
 
 protected:
     std::string GetTimestamp() override;

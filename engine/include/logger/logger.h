@@ -7,9 +7,9 @@ class Logger {
 public:
     virtual ~Logger() = default;
 
-    virtual void Info(const std::string& message) = 0;
-    virtual void Warn(const std::string& message) = 0;
-    virtual void Error(const std::string& message) = 0;
+    virtual void Info(const std::string& message, const std::string& name) = 0;
+    virtual void Warn(const std::string& message, const std::string& name) = 0;
+    virtual void Error(const std::string& message, const std::string& name) = 0;
 
 protected:
     virtual std::string GetTimestamp() = 0;
