@@ -76,14 +76,14 @@ int main(int argc, char* argv[]) {
     } else {
         type_indicator = " as replica";
     }
-    std::cout << "server running on " << server_address << type_indicator << std::endl;
+    vector_db_service.GetEngine()->GetLogger()->Info("server running on " + server_address + type_indicator, name);
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
-    std::thread shutdown_thread([&server]() {
+    std::thread shutdown_thread([&server, &vector_db_service, &name]() {
         while (!shutdown) {
             std::this_thread::sleep_for(std::chrono::milliseconds(kShutdownCheckInterval));
         }
-        std::cout << "server shutting down..." << std::endl;
+        vector_db_service.GetEngine()->GetLogger()->Info("server shutting down...", name);
         server->Shutdown();
     });
 

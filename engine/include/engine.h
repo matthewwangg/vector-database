@@ -79,6 +79,8 @@ public:
     void BackgroundWaitForSyncLoop();
     void ApplyWALEntry(const vector_db::WALEntry& entry);
 
+    Logger* GetLogger() const;
+
 private:
     Metadata metadata_;
     std::atomic<bool> shutdown_;

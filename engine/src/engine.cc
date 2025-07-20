@@ -580,4 +580,8 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
     }
 }
 
+Logger* Engine::GetLogger() const {
+    return logger_.get();
+}
+
 } // namespace vector_db_engine

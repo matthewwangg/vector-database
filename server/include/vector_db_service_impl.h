@@ -24,6 +24,8 @@ public:
     grpc::Status CreateTable(grpc::ServerContext* context, const vector_db::CreateTableRequest* request, vector_db::CreateTableResponse* response) override;
     grpc::Status DropTable(grpc::ServerContext* context, const vector_db::DropTableRequest* request, vector_db::DropTableResponse* response) override;
     grpc::Status HealthCheck(grpc::ServerContext* context, const vector_db::Empty* request, vector_db::Status* response) override;
+
+    vector_db_engine::Engine* GetEngine() const;
 private:
     std::unique_ptr<vector_db_engine::Engine> engine_;
 };
