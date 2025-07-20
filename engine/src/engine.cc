@@ -14,6 +14,7 @@
 
 #include "hnsw_index.h"
 #include "local_logger.h"
+#include "logger.h"
 #include "remote_logger.h"
 #include "thread_pool.h"
 #include "vector_store.h"
@@ -326,7 +327,7 @@ bool Engine::CreateTable(std::string name) {
 
     auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality);
     auto vector_store = std::make_unique<VectorStore>(std::move(hnsw_index), vector_dimensionality);
-    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, store_snapshot, index_snapshot, write_ahead_log);
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
     auto lru_cache = std::make_unique<LRUCache>(cache_size);
 
     store_map_[name] = std::move(vector_store);
@@ -364,7 +365,7 @@ bool Engine::CreateTableWithoutLock(std::string name) {
 
     auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality);
     auto vector_store = std::make_unique<VectorStore>(std::move(hnsw_index), vector_dimensionality);
-    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, store_snapshot, index_snapshot, write_ahead_log);
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
     auto lru_cache = std::make_unique<LRUCache>(cache_size);
 
     store_map_[name] = std::move(vector_store);

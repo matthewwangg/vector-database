@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "logger.h"
 #include "vector_store.h"
 
 #include "replica.pb.h"
@@ -19,7 +20,7 @@ using Vector = std::vector<float>;
 
 class VectorPersistenceManager {
 public:
-    VectorPersistenceManager(std::string name, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path);
+    VectorPersistenceManager(std::string name, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path, Logger* logger);
 
     void SaveSnapshot(const VectorStore& store) const;
     std::unique_ptr<VectorStore> LoadSnapshot() const;
@@ -44,6 +45,8 @@ private:
     std::string wal_file_path_;
     std::ofstream wal_out_;
     std::mutex wal_log_mutex_;
+
+    Logger* logger_;
 };
 
 } // namespace vector_db_engine

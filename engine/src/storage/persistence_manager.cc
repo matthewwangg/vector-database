@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "hnsw_index.h"
+#include "logger.h"
 #include "vector_store.h"
 
 #include "replica.pb.h"
@@ -16,11 +17,12 @@
 
 namespace vector_db_engine {
 
-VectorPersistenceManager::VectorPersistenceManager(std::string name, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path)
+VectorPersistenceManager::VectorPersistenceManager(std::string name, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path, Logger* logger)
     : name_(name),
       store_snapshot_file_path_(GetFullFilepath(store_snapshot_file_path)),
       index_snapshot_file_path_(GetFullFilepath(index_snapshot_file_path)),
-      wal_file_path_(GetFullFilepath(wal_file_path))
+      wal_file_path_(GetFullFilepath(wal_file_path)),
+      logger_(logger)
 {
     const std::string base = std::string(std::getenv("HOME")) + "/.vector_db/" + name_ + "/";
     const std::string suffix = "_wal.log";
@@ -28,7 +30,7 @@ VectorPersistenceManager::VectorPersistenceManager(std::string name, std::string
 
     wal_out_.open(wal_file_path_, std::ios::app);
     if (!wal_out_) {
-        std::cout << "failed to open write-ahead log" << std::endl;
+        logger_->Error("failed to open write-ahead log", name_);
     }
 }
 
@@ -48,14 +50,14 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
 
     std::ofstream out_store(store_snapshot_file_path_, std::ios::binary);
     if (!out_store) {
-        std::cout << "failed to open store file" << std::endl;
+        logger_->Error("failed to open store file", name_);
         return;
     }
     store_snapshot.SerializeToOstream(&out_store);
 
     const auto* index = dynamic_cast<const HNSWIndex*>(store.GetIndex());
     if (!index) {
-        std::cout << "failed to get index, skipping index save" << std::endl;
+        logger_->Error("failed to get index, skipping index save", name_);
         return;
     }
 
@@ -107,7 +109,7 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
 
     std::ofstream out_index(index_snapshot_file_path_, std::ios::binary);
     if (!out_index) {
-        std::cout << "failed to open index file" << std::endl;
+        logger_->Error("failed to open index file", name_);
         return;
     }
     index_snapshot.SerializeToOstream(&out_index);
@@ -116,7 +118,7 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
         return;
     }
 
-    std::cout << table_name_ << " snapshot saved successfully" << std::endl;
+    logger_->Info(table_name_ + " snapshot saved successfully", name_);
 }
 
 std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
@@ -186,7 +188,7 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
         return nullptr;
     }
 
-    std::cout << table_name_ << " snapshot loaded successfully with " << store_snapshot.vector_entry_size() << " vectors, " << index_snapshot.nodes_size() << " index nodes, and dimensionality of " << store_snapshot.vector_dimensionality() << std::endl;
+    logger_->Info(table_name_ + " snapshot loaded successfully with " + std::to_string(store_snapshot.vector_entry_size()) + " vectors, " + std::to_string(index_snapshot.nodes_size()) + " index nodes, and dimensionality of " + std::to_string(store_snapshot.vector_dimensionality()), name_);
 
     return std::move(loaded_store);
 }
@@ -253,7 +255,7 @@ void VectorPersistenceManager::ReplayWAL(VectorStore& store) {
         return;
     }
 
-    std::cout << table_name_ << " write-ahead log replay completed" << std::endl;
+    logger_->Info(table_name_ + " write-ahead log replay completed", name_);
 }
 
 void VectorPersistenceManager::ClearWAL() {
@@ -266,7 +268,7 @@ void VectorPersistenceManager::ClearWAL() {
         return;
     }
 
-    std::cout << table_name_ << " write-ahead log cleared" << std::endl;
+    logger_->Info(table_name_ + " write-ahead log cleared", name_);
 }
 
 void VectorPersistenceManager::Clear() {
