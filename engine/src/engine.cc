@@ -79,7 +79,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     }
 
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
-    logger_ = std::make_unique<LocalLogger>();
+    logger_ = std::make_unique<RemoteLogger>("0.0.0.0:50051");
 
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
     if (metadata_.primary && !replicas.empty()) {
