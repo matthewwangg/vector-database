@@ -172,7 +172,6 @@ std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> en
     float entry_point_distance = ComputeDistance(query, nodes_.at(entry_point_id).vector);
 
     candidates.emplace(entry_point_distance, entry_point_id);
-    top_ef.emplace(entry_point_distance, entry_point_id);
     visited.insert(entry_point_id);
 
     while (!candidates.empty()) {
