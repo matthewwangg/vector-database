@@ -27,6 +27,7 @@ add_executable(vector_db_tests
         engine/tests/hnsw_index_test.cc
         engine/tests/vector_store_test.cc
         engine/tests/persistence_manager_test.cc
+        engine/tests/engine_test.cc
 )
 
 target_link_libraries(vector_db_tests

@@ -4,8 +4,6 @@
 #include "vector_store.h"
 
 #include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <memory>
 #include <vector>
 
