@@ -124,7 +124,22 @@ grpc::Status VectorDatabaseServiceImpl::Metrics(grpc::ServerContext* context, co
 }
 
 grpc::Status VectorDatabaseServiceImpl::CreateTable(grpc::ServerContext* context, const vector_db::CreateTableRequest* request, vector_db::CreateTableResponse* response) {
-    bool ok = engine_->CreateTable(request->name());
+    std::string name = request->name();
+    int vector_dimensionality = request->store_config().vector_dimensionality();
+    std::size_t m = request->hnsw_index_config().m();
+    std::size_t m0 = request->hnsw_index_config().m0();
+    std::size_t ef_construction = request->hnsw_index_config().ef_construction();
+    float ml = request->hnsw_index_config().ml();
+    std::size_t cache_size = request->cache_config().cache_size();
+
+    vector_db_engine::HNSWIndex::DistanceMetric distance_metric;
+    if (request->hnsw_index_config().distance_metric() == vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2) {
+        distance_metric = vector_db_engine::HNSWIndex::DistanceMetric::L2;
+    } else {
+        distance_metric = vector_db_engine::HNSWIndex::DistanceMetric::Cosine;
+    }
+
+    bool ok = engine_->CreateTable(name, vector_dimensionality, m, m0, ef_construction, ml, distance_metric, cache_size);
     response->set_successful(ok);
 
     return grpc::Status::OK;

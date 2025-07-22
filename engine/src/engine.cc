@@ -63,7 +63,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     }();
 
     for (const std::string& table : table_names) {
-        bool ok = CreateTable(table);
+        bool ok = CreateTable(table, 384, 16, 32, 64, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, 32);
         if (!ok) {
             continue;
         }
@@ -302,7 +302,7 @@ Engine::Metrics Engine::GetMetrics(std::string table_name) {
     return metrics_map_[table_name];
 }
 
-bool Engine::CreateTable(std::string name) {
+bool Engine::CreateTable(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size) {
     std::unique_lock lock(engine_mutex_);
     if (!metadata_.primary || shutdown_ || name.empty()) {
         return false;
@@ -311,15 +311,6 @@ bool Engine::CreateTable(std::string name) {
     if (store_map_.contains(name) || persistence_manager_map_.contains(name) || stats_map_.contains(name) || metrics_map_.contains(name) || removed_flag_map_.contains(name) || cache_map_.contains(name)) {
         return false;
     }
-
-    std::size_t m = 16;
-    std::size_t m0 = 32;
-    std::size_t ef_construction = 64;
-    float ml = 1.0f;
-    int vector_dimensionality = 384;
-    auto distance_metric = vector_db_engine::HNSWIndex::DistanceMetric::L2;
-
-    std::size_t cache_size = 32;
 
     std::string store_snapshot = name + "_" + kStoreSnapshotFilename;
     std::string index_snapshot = name + "_" + kIndexSnapshotFilename;
@@ -341,7 +332,7 @@ bool Engine::CreateTable(std::string name) {
     return true;
 }
 
-bool Engine::CreateTableWithoutLock(std::string name) {
+bool Engine::CreateTableWithoutLock(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size) {
     if (shutdown_ || name.empty()) {
         return false;
     }
@@ -349,15 +340,6 @@ bool Engine::CreateTableWithoutLock(std::string name) {
     if (store_map_.contains(name) || persistence_manager_map_.contains(name) || stats_map_.contains(name) || metrics_map_.contains(name) || removed_flag_map_.contains(name) || cache_map_.contains(name)) {
         return false;
     }
-
-    std::size_t m = 16;
-    std::size_t m0 = 32;
-    std::size_t ef_construction = 64;
-    float ml = 1.0f;
-    int vector_dimensionality = 384;
-    auto distance_metric = vector_db_engine::HNSWIndex::DistanceMetric::L2;
-
-    std::size_t cache_size = 32;
 
     std::string store_snapshot = name + "_" + kStoreSnapshotFilename;
     std::string index_snapshot = name + "_" + kIndexSnapshotFilename;
@@ -558,7 +540,7 @@ void Engine::BackgroundWaitForSyncLoop() {
 void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
     std::unique_lock lock(engine_mutex_);
     if (!store_map_.contains(entry.table()) || !stats_map_.contains(entry.table()) || !removed_flag_map_.contains(entry.table())) {
-        bool ok = CreateTableWithoutLock(entry.table());
+        bool ok = CreateTableWithoutLock(entry.table(), 384, 16, 32, 64, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, 32);
         if (!ok) {
             return;
         }

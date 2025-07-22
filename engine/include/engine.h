@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "hnsw_index.h"
 #include "logger.h"
 #include "lru_cache.h"
 #include "persistence_manager.h"
@@ -65,8 +66,8 @@ public:
     Stats GetStats(std::string table_name);
     Metrics GetMetrics(std::string table_name);
 
-    bool CreateTable(std::string name);
-    bool CreateTableWithoutLock(std::string name);
+    bool CreateTable(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
+    bool CreateTableWithoutLock(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
     bool DropTable(std::string name);
     bool DropTableWithoutLock(std::string name);
 

@@ -144,6 +144,37 @@ message MetricsResponse {
 
 message CreateTableRequest {
   string name = 1;
+
+  message StoreConfig {
+    int32 vector_dimensionality = 1;
+  }
+
+  StoreConfig store_config = 2;
+
+  message HNSWIndexConfig {
+    uint64 m = 1;
+    uint64 m0 = 2;
+    uint64 ef_construction = 3;
+    float ml = 4;
+    int32 vector_dimensionality = 5;
+
+    enum DistanceMetric {
+      L2 = 0;
+      COSINE = 1;
+    }
+
+    DistanceMetric distance_metric = 6;
+  }
+
+  oneof index_config {
+    HNSWIndexConfig hnsw_index_config = 3;
+  }
+
+  message CacheConfig {
+    uint64 cache_size = 1;
+  }
+
+  CacheConfig cache_config = 4;
 }
 
 message CreateTableResponse {
