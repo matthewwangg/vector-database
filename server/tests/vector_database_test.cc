@@ -1,6 +1,7 @@
 #include "engine.h"
 #include "vector_db_service_impl.h"
 
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -36,6 +37,7 @@ protected:
     void TearDown() override {
         server_->Shutdown();
         server_->Wait();
+        std::filesystem::remove_all(std::string(std::getenv("HOME")) + "/.vector_db/unit_test");
     }
 
     std::vector<float> MakeVector() {
@@ -65,4 +67,60 @@ TEST_F(VectorDatabaseE2ETest, HealthCheck) {
     EXPECT_TRUE(status.ok());
     EXPECT_TRUE(response.successful());
     EXPECT_EQ(response.message(), "Healthy!");
+}
+
+TEST_F(VectorDatabaseE2ETest, CreateTable) {
+    grpc::ClientContext context;
+    vector_db::CreateTableResponse response;
+
+    vector_db::CreateTableRequest request;
+    request.set_name("test_table");
+    request.mutable_store_config()->set_vector_dimensionality(384);
+    request.mutable_cache_config()->set_cache_size(32);
+
+    auto* hnsw_config = request.mutable_hnsw_index_config();
+    hnsw_config->set_m(16);
+    hnsw_config->set_m0(32);
+    hnsw_config->set_ef_construction(64);
+    hnsw_config->set_ml(1.0f);
+    hnsw_config->set_vector_dimensionality(384);
+    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2);
+
+    grpc::Status status = stub_->CreateTable(&context, request, &response);
+
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(response.successful());
+}
+
+TEST_F(VectorDatabaseE2ETest, DropTable) {
+    grpc::ClientContext create_table_context;
+    vector_db::CreateTableResponse create_table_response;
+
+    vector_db::CreateTableRequest create_table_request;
+    create_table_request.set_name("test_table");
+    create_table_request.mutable_store_config()->set_vector_dimensionality(384);
+    create_table_request.mutable_cache_config()->set_cache_size(32);
+    auto* hnsw_config = create_table_request.mutable_hnsw_index_config();
+    hnsw_config->set_m(16);
+    hnsw_config->set_m0(32);
+    hnsw_config->set_ef_construction(64);
+    hnsw_config->set_ml(1.0f);
+    hnsw_config->set_vector_dimensionality(384);
+    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2);
+
+    grpc::Status create_table_status = stub_->CreateTable(&create_table_context, create_table_request, &create_table_response);
+
+    ASSERT_TRUE(create_table_status.ok());
+    ASSERT_TRUE(create_table_response.successful());
+
+    grpc::ClientContext context;
+    vector_db::DropTableResponse response;
+
+    vector_db::DropTableRequest request;
+    request.set_name("test_table");
+
+    grpc::Status status = stub_->DropTable(&context, request, &response);
+
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(response.successful());
 }
