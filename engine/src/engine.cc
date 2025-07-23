@@ -415,6 +415,15 @@ bool Engine::DropTableWithoutLock(std::string name) {
     return true;
 }
 
+std::vector<std::string> Engine::ListTables() {
+    std::shared_lock lock(engine_mutex_);
+    std::vector<std::string> tables;
+    for (const auto& [table, store] : store_map_) {
+        tables.push_back(table);
+    }
+    return tables;
+}
+
 void Engine::BackgroundCleanupLoop() {
     std::unique_lock<std::mutex> lock(cleanup_mutex_);
     while (!shutdown_) {

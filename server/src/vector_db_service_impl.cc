@@ -152,6 +152,15 @@ grpc::Status VectorDatabaseServiceImpl::DropTable(grpc::ServerContext* context, 
     return grpc::Status::OK;
 }
 
+grpc::Status VectorDatabaseServiceImpl::ListTables(grpc::ServerContext* context, const vector_db::ListTablesRequest* request, vector_db::ListTablesResponse* response) {
+    std::vector<std::string> table_names = engine_->ListTables();
+    for (const auto& table_name : table_names) {
+        response->add_table(table_name);
+    }
+
+    return grpc::Status::OK;
+}
+
 grpc::Status VectorDatabaseServiceImpl::HealthCheck(grpc::ServerContext* context, const vector_db::Empty* request, vector_db::Status* response) {
     response->set_successful(true);
     response->set_message("Healthy!");

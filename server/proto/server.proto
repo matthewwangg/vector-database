@@ -16,6 +16,7 @@ service VectorDatabase {
 
   rpc CreateTable(CreateTableRequest) returns (CreateTableResponse);
   rpc DropTable(DropTableRequest) returns (DropTableResponse);
+  rpc ListTables(ListTablesRequest) returns (ListTablesResponse);
 
   rpc HealthCheck(Empty) returns (Status);
 }
@@ -187,4 +188,10 @@ message DropTableRequest {
 
 message DropTableResponse {
   bool successful = 1;
+}
+
+message ListTablesRequest {}
+
+message ListTablesResponse {
+  repeated string table = 1;
 }

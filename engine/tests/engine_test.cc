@@ -69,6 +69,15 @@ TEST_F(EngineTest, DropTable) {
     EXPECT_TRUE(engine_->DropTable(table));
 }
 
+TEST_F(EngineTest, ListTables) {
+    std::string table = "test_table";
+    ASSERT_TRUE(engine_->CreateTable(table, 384, 16, 32, 64, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, 32));
+
+    auto tables = engine_->ListTables();
+    ASSERT_EQ(tables.size(), 1);
+    EXPECT_EQ(tables[0], table);
+}
+
 TEST_F(EngineTest, Insert) {
     std::string table = "test_table";
     ASSERT_TRUE(engine_->CreateTable(table, 384, 16, 32, 64, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, 32));

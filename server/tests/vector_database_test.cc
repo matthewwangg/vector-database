@@ -121,6 +121,36 @@ TEST_F(VectorDatabaseE2ETest, DropTable) {
     EXPECT_TRUE(response.successful());
 }
 
+TEST_F(VectorDatabaseE2ETest, ListTables) {
+    grpc::ClientContext create_table_context;
+    vector_db::CreateTableResponse create_table_response;
+    vector_db::CreateTableRequest create_table_request;
+    create_table_request.set_name("test_table");
+    create_table_request.mutable_store_config()->set_vector_dimensionality(384);
+    create_table_request.mutable_cache_config()->set_cache_size(32);
+    auto* hnsw_config = create_table_request.mutable_hnsw_index_config();
+    hnsw_config->set_m(16);
+    hnsw_config->set_m0(32);
+    hnsw_config->set_ef_construction(64);
+    hnsw_config->set_ml(1.0f);
+    hnsw_config->set_vector_dimensionality(384);
+    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2);
+
+    grpc::Status create_table_status = stub_->CreateTable(&create_table_context, create_table_request, &create_table_response);
+
+    ASSERT_TRUE(create_table_status.ok());
+    ASSERT_TRUE(create_table_response.successful());
+
+    grpc::ClientContext context;
+    vector_db::ListTablesResponse response;
+    vector_db::ListTablesRequest request;
+
+    grpc::Status status = stub_->ListTables(&context, request, &response);
+
+    EXPECT_TRUE(status.ok());
+    EXPECT_THAT(response.table(), ::testing::Contains("test_table"));
+}
+
 TEST_F(VectorDatabaseE2ETest, Insert) {
     grpc::ClientContext create_table_context;
     vector_db::CreateTableResponse create_table_response;
@@ -237,7 +267,7 @@ TEST_F(VectorDatabaseE2ETest, Search) {
     insert_request.set_table("test_table");
     std::vector<float> vector = MakeVector();
     for (const auto& value : vector) {
-    insert_request.add_vector(value);
+        insert_request.add_vector(value);
     }
 
     grpc::Status insert_status = stub_->Insert(&insert_context, insert_request, &insert_response);

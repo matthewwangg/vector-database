@@ -70,6 +70,7 @@ public:
     bool CreateTableWithoutLock(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
     bool DropTable(std::string name);
     bool DropTableWithoutLock(std::string name);
+    std::vector<std::string> ListTables();
 
     void BackgroundCleanupLoop();
     void Cleanup(const std::string& table_name, bool force);
