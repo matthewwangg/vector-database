@@ -13,6 +13,9 @@ VectorDatabaseServiceImpl::VectorDatabaseServiceImpl(std::unique_ptr<vector_db_e
 {}
 
 grpc::Status VectorDatabaseServiceImpl::Insert(grpc::ServerContext* context, const vector_db::InsertRequest* request, vector_db::InsertResponse* response) {
+    if (request->table().empty()) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing table");
+    }
     vector_db_engine::Vector vector(request->vector().begin(), request->vector().end());
 
     bool successful = engine_->Insert(request->table(), request->id(), vector,request->content());
@@ -26,6 +29,9 @@ grpc::Status VectorDatabaseServiceImpl::Insert(grpc::ServerContext* context, con
 }
 
 grpc::Status VectorDatabaseServiceImpl::Remove(grpc::ServerContext* context, const vector_db::RemoveRequest* request, vector_db::RemoveResponse* response) {
+    if (request->table().empty()) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing table");
+    }
     bool successful = engine_->Remove(request->table(), request->id());
     response->set_successful(successful);
 
@@ -37,6 +43,9 @@ grpc::Status VectorDatabaseServiceImpl::Remove(grpc::ServerContext* context, con
 }
 
 grpc::Status VectorDatabaseServiceImpl::Search(grpc::ServerContext* context, const vector_db::SearchRequest* request, vector_db::SearchResponse* response) {
+    if (request->table().empty()) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing table");
+    }
     vector_db_engine::Vector query(request->query().begin(), request->query().end());
 
     std::vector<vector_db_engine::VectorStore::Data> results = engine_->Search(request->table(), query, request->k(), request->search_parameter());
@@ -51,6 +60,9 @@ grpc::Status VectorDatabaseServiceImpl::Search(grpc::ServerContext* context, con
 }
 
 grpc::Status VectorDatabaseServiceImpl::BatchInsert(grpc::ServerContext* context, const vector_db::BatchInsertRequest* request, vector_db::BatchInsertResponse* response) {
+    if (request->table().empty()) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing table");
+    }
     std::vector<std::tuple<vector_db_engine::Id, vector_db_engine::Vector, std::string>> vectors;
 
     for (const auto& vector_data : request->vector_data()) {
@@ -66,6 +78,9 @@ grpc::Status VectorDatabaseServiceImpl::BatchInsert(grpc::ServerContext* context
 }
 
 grpc::Status VectorDatabaseServiceImpl::BatchRemove(grpc::ServerContext* context, const vector_db::BatchRemoveRequest* request, vector_db::BatchRemoveResponse* response) {
+    if (request->table().empty()) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing table");
+    }
     std::vector<vector_db_engine::Id> ids(request->id().begin(), request->id().end());
 
     std::vector<bool> success_flags = engine_->BatchRemove(request->table(), ids);
@@ -77,6 +92,9 @@ grpc::Status VectorDatabaseServiceImpl::BatchRemove(grpc::ServerContext* context
 }
 
 grpc::Status VectorDatabaseServiceImpl::BatchSearch(grpc::ServerContext* context, const vector_db::BatchSearchRequest* request, vector_db::BatchSearchResponse* response) {
+    if (request->table().empty()) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing table");
+    }
     std::vector<std::tuple<vector_db_engine::Vector, std::size_t, std::size_t>> requests;
     for (const auto& query : request->query()) {
         requests.emplace_back(vector_db_engine::Vector(query.query().begin(), query.query().end()), query.k(), query.search_parameter());
@@ -96,6 +114,9 @@ grpc::Status VectorDatabaseServiceImpl::BatchSearch(grpc::ServerContext* context
 }
 
 grpc::Status VectorDatabaseServiceImpl::Stats(grpc::ServerContext* context, const vector_db::StatsRequest* request, vector_db::StatsResponse* response) {
+    if (request->table().empty()) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing table");
+    }
     vector_db_engine::Engine::Stats stats = engine_->GetStats(request->table());
 
     response->set_vector_count(stats.vector_count);
@@ -106,6 +127,9 @@ grpc::Status VectorDatabaseServiceImpl::Stats(grpc::ServerContext* context, cons
 }
 
 grpc::Status VectorDatabaseServiceImpl::Metrics(grpc::ServerContext* context, const vector_db::MetricsRequest* request, vector_db::MetricsResponse* response) {
+    if (request->table().empty()) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing table");
+    }
     vector_db_engine::MetricsManager::Metrics metrics = engine_->GetMetrics(request->table());
 
     response->set_insert_count(metrics.insert_count);
@@ -132,6 +156,9 @@ grpc::Status VectorDatabaseServiceImpl::CreateTable(grpc::ServerContext* context
     std::size_t ef_construction = request->hnsw_index_config().ef_construction();
     float ml = request->hnsw_index_config().ml();
     std::size_t cache_size = request->cache_config().cache_size();
+    if (name.empty() || vector_dimensionality == 0 || m == 0 || m0 == 0 || ef_construction == 0 || ml == 0.0f) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing arguments");
+    }
 
     vector_db_engine::HNSWIndex::DistanceMetric distance_metric;
     if (request->hnsw_index_config().distance_metric() == vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2) {
@@ -147,6 +174,9 @@ grpc::Status VectorDatabaseServiceImpl::CreateTable(grpc::ServerContext* context
 }
 
 grpc::Status VectorDatabaseServiceImpl::DropTable(grpc::ServerContext* context, const vector_db::DropTableRequest* request, vector_db::DropTableResponse* response) {
+    if (request->name().empty()) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing name");
+    }
     bool ok = engine_->DropTable(request->name());
     response->set_successful(ok);
 
