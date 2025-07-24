@@ -6,6 +6,7 @@
 
 #include "engine.h"
 #include "hnsw_index.h"
+#include "metrics_manager.h"
 
 VectorDatabaseServiceImpl::VectorDatabaseServiceImpl(std::unique_ptr<vector_db_engine::Engine> engine)
     : engine_(std::move(engine))
@@ -105,7 +106,7 @@ grpc::Status VectorDatabaseServiceImpl::Stats(grpc::ServerContext* context, cons
 }
 
 grpc::Status VectorDatabaseServiceImpl::Metrics(grpc::ServerContext* context, const vector_db::MetricsRequest* request, vector_db::MetricsResponse* response) {
-    vector_db_engine::Engine::Metrics metrics = engine_->GetMetrics(request->table());
+    vector_db_engine::MetricsManager::Metrics metrics = engine_->GetMetrics(request->table());
 
     response->set_insert_count(metrics.insert_count);
     response->set_remove_count(metrics.remove_count);
