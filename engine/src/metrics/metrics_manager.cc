@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <mutex>
 
+namespace vector_db_engine {
+
 MetricsManager::Metrics MetricsManager::GetMetrics() const {
     std::shared_lock lock(metrics_mutex_);
     return metrics_;
@@ -41,3 +43,5 @@ void MetricsManager::CalculateSearchLatency(float latency) {
     metrics_.max_search_latency_ms = std::max(metrics_.max_search_latency_ms, latency);
     metrics_.min_search_latency_ms = std::min(metrics_.min_search_latency_ms, latency);
 }
+
+} // namespace vector_db_engine

@@ -6,6 +6,8 @@
 #include <shared_mutex>
 #include <string>
 
+namespace vector_db_engine {
+
 class MetricsManager {
 public:
     struct Metrics {
@@ -45,5 +47,8 @@ private:
 
     mutable std::shared_mutex metrics_mutex_;
 };
+
+} // namespace vector_db_engine
+
 
 #endif //VECTOR_DATABASE_METRICS_MANAGER_H
