@@ -33,6 +33,8 @@ public:
         CACHE_MISS = 6
     };
 
+    MetricsManager() = default;
+
     Metrics GetMetrics() const;
 
     void Increment(CountType count_type, uint64_t step);
