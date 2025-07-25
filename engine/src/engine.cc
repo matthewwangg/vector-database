@@ -64,6 +64,9 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
         return tables;
     }();
 
+    thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
+    logger_ = std::make_unique<RemoteLogger>("0.0.0.0:50051");
+
     for (const std::string& table : table_names) {
         bool ok = CreateTable(table, 384, 16, 32, 64, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, 32);
         if (!ok) {
@@ -79,9 +82,6 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
 
         stats_manager_map_[table]->Set(StatsManager::StatType::VECTOR, store_map_[table]->GetStore().size());
     }
-
-    thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
-    logger_ = std::make_unique<RemoteLogger>("0.0.0.0:50051");
 
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
     if (metadata_.primary && !replicas.empty()) {
