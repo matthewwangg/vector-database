@@ -29,6 +29,7 @@ public:
     void Increment(StatType stat_type);
     void Reset(StatType stat_type);
     void Set(StatType stat_type, int value);
+    void AdjustForDeletions();
 
     void SetRemovedFlag(bool value);
 

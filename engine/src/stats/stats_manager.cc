@@ -63,6 +63,11 @@ void StatsManager::Set(StatsManager::StatType stat_type, int value) {
     }
 }
 
+void StatsManager::AdjustForDeletions() {
+    std::unique_lock lock(stats_mutex_);
+    stats_.vector_count = stats_.vector_count - stats_.deleted_count;
+}
+
 void StatsManager::SetRemovedFlag(bool value) {
     removed_ = value;
 }
