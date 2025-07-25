@@ -9,6 +9,7 @@ add_library(engine
         src/logger/local_logger.cc
         src/logger/remote_logger.cc
         src/metrics/metrics_manager.cc
+        src/stats/stats_manager.cc
         proto/storage.pb.cc
         proto/replica.pb.cc
         proto/replica.grpc.pb.cc
@@ -26,6 +27,7 @@ target_include_directories(engine PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include/replica
         ${CMAKE_CURRENT_SOURCE_DIR}/include/logger
         ${CMAKE_CURRENT_SOURCE_DIR}/include/metrics
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/stats
         ${CMAKE_CURRENT_SOURCE_DIR}/proto
 )
 

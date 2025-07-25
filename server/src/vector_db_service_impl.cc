@@ -7,6 +7,7 @@
 #include "engine.h"
 #include "hnsw_index.h"
 #include "metrics_manager.h"
+#include "stats_manager.h"
 
 VectorDatabaseServiceImpl::VectorDatabaseServiceImpl(std::unique_ptr<vector_db_engine::Engine> engine)
     : engine_(std::move(engine))
@@ -117,7 +118,7 @@ grpc::Status VectorDatabaseServiceImpl::Stats(grpc::ServerContext* context, cons
     if (request->table().empty()) {
         return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing table");
     }
-    vector_db_engine::Engine::Stats stats = engine_->GetStats(request->table());
+    vector_db_engine::StatsManager::Stats stats = engine_->GetStats(request->table());
 
     response->set_vector_count(stats.vector_count);
     response->set_deleted_count(stats.deleted_count);
