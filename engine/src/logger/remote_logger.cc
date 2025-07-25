@@ -40,7 +40,9 @@ void RemoteLogger::SendLog(const std::string& level, const std::string& message,
 
     grpc::ClientContext context;
     const char* api_key = std::getenv("LOG_SERVICE_API_KEY");
-    context.AddMetadata("authorization", api_key);
+    if (api_key) {
+        context.AddMetadata("authorization", api_key);
+    }
 
     logging::LogResponse response;
 
