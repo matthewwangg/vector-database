@@ -48,6 +48,21 @@ void StatsManager::Reset(StatsManager::StatType stat_type) {
     }
 }
 
+void StatsManager::Set(StatsManager::StatType stat_type, int value) {
+    std::unique_lock lock(stats_mutex_);
+    switch (stat_type) {
+        case StatType::VECTOR:
+            stats_.vector_count = value;
+            break;
+        case StatType::DELETED:
+            stats_.deleted_count = value;
+            break;
+        case StatType::STALE:
+            stats_.stale_count = value;
+            break;
+    }
+}
+
 void StatsManager::SetRemovedFlag(bool value) {
     removed_ = value;
 }
