@@ -75,6 +75,7 @@ private:
     std::unordered_map<std::string, std::unique_ptr<Cache>> cache_map_;
 
     mutable std::shared_mutex engine_mutex_;
+    std::mutex replica_mutex_;
 
     float reindex_threshold_;
     bool use_cache_;
@@ -87,8 +88,6 @@ private:
     std::atomic<bool> removed_;
     std::condition_variable cleanup_cv_;
     std::mutex cleanup_mutex_;
-
-    std::mutex replica_mutex_;
 };
 
 } // namespace vector_db_engine

@@ -430,7 +430,7 @@ void Engine::BackgroundCleanupLoop() {
 }
 
 void Engine::Cleanup(const std::string& table_name, bool force) {
-    std::shared_lock lock(engine_mutex_);
+    std::unique_lock lock(engine_mutex_);
     std::unique_lock replica_lock(replica_mutex_);
     if ((shutdown_ && !force) || (!store_map_.contains(table_name)|| !stats_manager_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
         return;
