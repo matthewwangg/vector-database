@@ -321,10 +321,32 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, std::size_
     cache_map_[name] = std::move(lru_cache);
     replica_wal_offsets_map_[name] = 0;
 
+    vector_db::CreateRequest request;
+    request.set_table(name);
+    request.mutable_store_config()->set_vector_dimensionality(vector_dimensionality);
+    request.mutable_hnsw_index_config()->set_m(m);
+    request.mutable_hnsw_index_config()->set_m0(m0);
+    request.mutable_hnsw_index_config()->set_ef_construction(ef_construction);
+    request.mutable_hnsw_index_config()->set_ml(ml);
+    if (distance_metric == HNSWIndex::DistanceMetric::L2) {
+        request.mutable_hnsw_index_config()->set_distance_metric(vector_db::CreateRequest_HNSWIndexConfig_DistanceMetric_L2);
+    } else {
+        request.mutable_hnsw_index_config()->set_distance_metric(vector_db::CreateRequest_HNSWIndexConfig_DistanceMetric_COSINE);
+    }
+    request.mutable_cache_config()->set_cache_size(cache_size);
+
+    for (const auto& replica : replicas_) {
+        auto stub = vector_db::ReplicaManager::NewStub(grpc::CreateChannel(replica, grpc::InsecureChannelCredentials()));
+        vector_db::CreateResponse response;
+        grpc::ClientContext context;
+        grpc::Status status = stub->Create(&context, request, &response);
+    }
+
     return true;
 }
 
-bool Engine::CreateTableWithoutLock(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size) {
+bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size) {
+    std::unique_lock lock(replica_mutex_);
     if (shutdown_ || name.empty()) {
         return false;
     }
@@ -385,7 +407,8 @@ bool Engine::DropTable(std::string name) {
     return true;
 }
 
-bool Engine::DropTableWithoutLock(std::string name) {
+bool Engine::DropTableOnReplica(std::string name) {
+    std::unique_lock lock(replica_mutex_);
     if (shutdown_ || name.empty()) {
         return false;
     }
@@ -439,6 +462,7 @@ void Engine::BackgroundCleanupLoop() {
 
 void Engine::Cleanup(const std::string& table_name, bool force) {
     std::shared_lock lock(engine_mutex_);
+    std::unique_lock replica_lock(replica_mutex_);
     if ((shutdown_ && !force) || (!store_map_.contains(table_name)|| !stats_manager_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
         return;
     }
@@ -496,11 +520,9 @@ void Engine::Sync(bool force) {
 
 void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
     std::unique_lock lock(engine_mutex_);
+    std::unique_lock replica_lock(replica_mutex_);
     if (!store_map_.contains(entry.table()) || !stats_manager_map_.contains(entry.table())) {
-        bool ok = CreateTableWithoutLock(entry.table(), 384, 16, 32, 64, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, 32);
-        if (!ok) {
-            return;
-        }
+        return;
     }
     if (entry.type() == vector_db::WALEntry::INSERT) {
         Vector vector(entry.vector().begin(), entry.vector().end());

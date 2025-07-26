@@ -16,6 +16,7 @@ public:
     explicit ReplicaManagerServiceImpl(Engine* engine);
 
     grpc::Status Sync(grpc::ServerContext* context, const vector_db::SyncRequest* request, vector_db::SyncResponse* response) override;
+    grpc::Status Create(grpc::ServerContext* context, const vector_db::CreateRequest* request, vector_db::CreateResponse* response) override;
     grpc::Status Drop(grpc::ServerContext* context, const vector_db::DropRequest* request, vector_db::DropResponse* response) override;
 
 private:

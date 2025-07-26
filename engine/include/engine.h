@@ -49,18 +49,15 @@ public:
     MetricsManager::Metrics GetMetrics(std::string table_name);
 
     bool CreateTable(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
-    bool CreateTableWithoutLock(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
+    bool CreateTableOnReplica(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
     bool DropTable(std::string name);
-    bool DropTableWithoutLock(std::string name);
+    bool DropTableOnReplica(std::string name);
     std::vector<std::string> ListTables();
 
     void BackgroundCleanupLoop();
     void Cleanup(const std::string& table_name, bool force);
 
-    void BackgroundSyncReplicasLoop();
     void Sync(bool force);
-
-    void BackgroundWaitForSyncLoop();
     void ApplyWALEntry(const vector_db::WALEntry& entry);
 
     Logger* GetLogger() const;
@@ -91,6 +88,8 @@ private:
     std::atomic<bool> removed_;
     std::condition_variable cleanup_cv_;
     std::mutex cleanup_mutex_;
+
+    std::mutex replica_mutex_;
 };
 
 } // namespace vector_db_engine
