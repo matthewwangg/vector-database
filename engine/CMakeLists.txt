@@ -10,6 +10,7 @@ add_library(engine
         src/logger/remote_logger.cc
         src/metrics/metrics_manager.cc
         src/stats/stats_manager.cc
+        src/replica/replica_manager.cc
         proto/storage.pb.cc
         proto/replica.pb.cc
         proto/replica.grpc.pb.cc
