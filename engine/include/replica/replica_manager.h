@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace vector_db_engine {
@@ -15,7 +16,8 @@ class Engine;
 
 class ReplicaManager {
 public:
-    ReplicaManager(Engine* engine, std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown);
+    explicit ReplicaManager(Engine* engine, std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown);
+    ~ReplicaManager();
 
     void RunReplicaServer();
     void RunReplicaSyncLoop();
@@ -30,6 +32,7 @@ private:
     std::string sync_server_address_;
     std::vector<std::string> replicas_;
 
+    std::thread sync_thread_;
     std::condition_variable sync_cv_;
     std::mutex sync_mutex_;
 };

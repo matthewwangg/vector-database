@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <grpcpp/grpcpp.h>
@@ -23,7 +24,19 @@ ReplicaManager::ReplicaManager(Engine* engine, std::string name, bool primary, s
       sync_server_address_(sync_server_address),
       replicas_(replicas),
       shutdown_(shutdown)
-{}
+{
+    if (primary_ && !replicas_.empty()) {
+        sync_thread_ = std::thread(&ReplicaManager::RunReplicaSyncLoop, this);
+    } else if (!primary_) {
+        sync_thread_ = std::thread(&ReplicaManager::RunReplicaServer, this);
+    }
+}
+
+ReplicaManager::~ReplicaManager() {
+    if (sync_thread_.joinable()) {
+        sync_thread_.join();
+    }
+}
 
 void ReplicaManager::RunReplicaServer() {
     if (sync_server_address_.empty()) {

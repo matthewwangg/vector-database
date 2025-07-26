@@ -28,7 +28,6 @@
 namespace vector_db_engine {
 
 constexpr int kCleanupInterval = 60;
-constexpr int kSyncInterval = 90;
 constexpr int kShutdownCheckInterval = 1000;
 
 inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
@@ -66,6 +65,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
 
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
     logger_ = std::make_unique<RemoteLogger>("0.0.0.0:50051");
+    replica_manager_ = std::make_unique<ReplicaManager>(this, metadata_.name, metadata_.primary, sync_server_address, replicas, shutdown_);
 
     for (const std::string& table : table_names) {
         bool ok = CreateTable(table, 384, 16, 32, 64, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, 32);
@@ -84,19 +84,10 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     }
 
     cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
-    if (metadata_.primary && !replicas.empty()) {
-        sync_thread_ = std::thread(&Engine::BackgroundSyncReplicasLoop, this);
-    } else if (!metadata_.primary) {
-        sync_thread_ = std::thread(&Engine::BackgroundWaitForSyncLoop, this);
-    }
 }
 
 Engine::~Engine() {
     shutdown_ = true;
-    if (sync_thread_.joinable()) {
-        sync_thread_.join();
-    }
-
     cleanup_cv_.notify_one();
     if (cleanup_thread_.joinable()) {
         cleanup_thread_.join();
@@ -472,23 +463,6 @@ void Engine::Cleanup(const std::string& table_name, bool force) {
     }
 }
 
-void Engine::BackgroundSyncReplicasLoop() {
-    std::unique_lock<std::mutex> lock(sync_mutex_);
-    while (!shutdown_) {
-        sync_cv_.wait_for(lock, std::chrono::seconds(kSyncInterval));
-
-        if (shutdown_) {
-            break;
-        }
-
-        auto start = std::chrono::steady_clock::now();
-        Sync(false);
-        auto end = std::chrono::steady_clock::now();
-        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        logger_->Info("sync completed in " + std::to_string(duration_ms) + " ms", metadata_.name);
-    }
-}
-
 void Engine::Sync(bool force) {
     std::shared_lock lock(engine_mutex_);
     if ((shutdown_ && !force)) {
@@ -518,33 +492,6 @@ void Engine::Sync(bool force) {
 
         replica_wal_offsets_map_[table] += entries.size();
     }
-}
-
-void Engine::BackgroundWaitForSyncLoop() {
-    if (metadata_.sync_server_address.empty()) {
-        logger_->Warn("no sync server address specified", metadata_.name);
-        return;
-    }
-
-    ReplicaManagerServiceImpl replica_manager_service(this);
-
-    grpc::ServerBuilder builder;
-    builder.AddListeningPort(metadata_.sync_server_address, grpc::InsecureServerCredentials());
-    builder.RegisterService(&replica_manager_service);
-
-    logger_->Info("replica sync server running on " + metadata_.sync_server_address, metadata_.name);
-    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-
-    std::thread shutdown_thread([&server, this]() {
-        while (!shutdown_) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(kShutdownCheckInterval));
-        }
-        logger_->Info("replica sync server shutting down...", metadata_.name);
-        server->Shutdown();
-    });
-
-    server->Wait();
-    shutdown_thread.join();
 }
 
 void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {

@@ -17,6 +17,7 @@
 #include "lru_cache.h"
 #include "metrics_manager.h"
 #include "persistence_manager.h"
+#include "replica_manager.h"
 #include "stats_manager.h"
 #include "thread_pool.h"
 #include "vector_store.h"
@@ -84,15 +85,12 @@ private:
 
     std::unique_ptr<ThreadPool> thread_pool_;
     std::unique_ptr<Logger> logger_;
+    std::unique_ptr<ReplicaManager> replica_manager_;
 
     std::thread cleanup_thread_;
     std::atomic<bool> removed_;
     std::condition_variable cleanup_cv_;
     std::mutex cleanup_mutex_;
-
-    std::thread sync_thread_;
-    std::condition_variable sync_cv_;
-    std::mutex sync_mutex_;
 };
 
 } // namespace vector_db_engine
