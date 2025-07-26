@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "cleaner.h"
 #include "hnsw_index.h"
 #include "local_logger.h"
 #include "logger.h"
@@ -26,7 +27,6 @@
 
 namespace vector_db_engine {
 
-constexpr int kCleanupInterval = 60;
 constexpr int kShutdownCheckInterval = 1000;
 
 inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
@@ -65,6 +65,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
     logger_ = std::make_unique<RemoteLogger>("0.0.0.0:50051");
     replica_manager_ = std::make_unique<ReplicaManager>(this, metadata_.name, metadata_.primary, sync_server_address, replicas, shutdown_);
+    cleaner_ = std::make_unique<Cleaner>(this, metadata_.name, shutdown_);
 
     for (const std::string& table : table_names) {
         bool ok = CreateTable(table, 384, 16, 32, 64, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, 32);
@@ -81,16 +82,10 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
 
         stats_manager_map_[table]->Set(StatsManager::StatType::VECTOR, store_map_[table]->GetStore().size());
     }
-
-    cleanup_thread_ = std::thread(&Engine::BackgroundCleanupLoop, this);
 }
 
 Engine::~Engine() {
     shutdown_ = true;
-    cleanup_cv_.notify_one();
-    if (cleanup_thread_.joinable()) {
-        cleanup_thread_.join();
-    }
 
     for (auto& [table, store] : store_map_) {
         if (!persistence_manager_map_.contains(table)) {
@@ -407,28 +402,6 @@ std::vector<std::string> Engine::ListTables() {
     return tables;
 }
 
-void Engine::BackgroundCleanupLoop() {
-    std::unique_lock<std::mutex> lock(cleanup_mutex_);
-    while (!shutdown_) {
-        cleanup_cv_.wait_for(lock, std::chrono::seconds(kCleanupInterval));
-
-        if (shutdown_) {
-            break;
-        }
-
-        for (auto& [table, store] : store_map_) {
-            if (stats_manager_map_.contains(table) && stats_manager_map_[table]->GetRemovedFlag()) {
-                auto start = std::chrono::steady_clock::now();
-                Cleanup(table, false);
-                auto end = std::chrono::steady_clock::now();
-                auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-                logger_->Info("cleanup completed in " + std::to_string(duration_ms) + " ms", metadata_.name);
-                stats_manager_map_[table]->SetRemovedFlag(false);
-            }
-        }
-    }
-}
-
 void Engine::Cleanup(const std::string& table_name, bool force) {
     std::unique_lock lock(engine_mutex_);
     std::unique_lock replica_lock(replica_mutex_);
@@ -483,8 +456,16 @@ Logger* Engine::GetLogger() const {
     return logger_.get();
 }
 
+const std::unordered_map<std::string, std::unique_ptr<VectorStore>>& Engine::GetStoreMap() const {
+    return store_map_;
+}
+
 const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>& Engine::GetPersistenceManagerMap() const {
     return persistence_manager_map_;
+}
+
+const std::unordered_map<std::string, std::unique_ptr<StatsManager>>& Engine::GetStatsManagerMap() const {
+    return stats_manager_map_;
 }
 
 } // namespace vector_db_engine

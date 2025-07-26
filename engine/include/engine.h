@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "cleaner.h"
 #include "hnsw_index.h"
 #include "logger.h"
 #include "lru_cache.h"
@@ -54,13 +55,13 @@ public:
     bool DropTableOnReplica(std::string name);
     std::vector<std::string> ListTables();
 
-    void BackgroundCleanupLoop();
     void Cleanup(const std::string& table_name, bool force);
-
     void ApplyWALEntry(const vector_db::WALEntry& entry);
 
     Logger* GetLogger() const;
+    const std::unordered_map<std::string, std::unique_ptr<VectorStore>>& GetStoreMap() const;
     const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>& GetPersistenceManagerMap() const;
+    const std::unordered_map<std::string, std::unique_ptr<StatsManager>>& GetStatsManagerMap() const;
 
 private:
     Metadata metadata_;
@@ -83,11 +84,7 @@ private:
     std::unique_ptr<ThreadPool> thread_pool_;
     std::unique_ptr<Logger> logger_;
     std::unique_ptr<ReplicaManager> replica_manager_;
-
-    std::thread cleanup_thread_;
-    std::atomic<bool> removed_;
-    std::condition_variable cleanup_cv_;
-    std::mutex cleanup_mutex_;
+    std::unique_ptr<Cleaner> cleaner_;
 };
 
 } // namespace vector_db_engine
