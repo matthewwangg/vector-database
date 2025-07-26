@@ -76,7 +76,6 @@ TEST_F(PersistenceManagerTest, AppendRemove) {
 
 TEST_F(PersistenceManagerTest, ReplayWAL) {
     persistence_manager_->AppendInsert(1, {0.5f, 0.4f, 0.6f, 0.2f}, "test_content_1");
-    //
     persistence_manager_->AppendInsert(2, {0.5f, 0.4f, 0.6f, 0.2f}, "test_content_2");
 
     persistence_manager_->ReplayWAL(*store_);
