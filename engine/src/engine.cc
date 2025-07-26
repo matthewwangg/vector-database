@@ -8,9 +8,8 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
-
-#include <grpcpp/grpcpp.h>
 
 #include "hnsw_index.h"
 #include "local_logger.h"
@@ -98,7 +97,7 @@ Engine::~Engine() {
             continue;
         }
         Cleanup(table, true);
-        Sync(true);
+        replica_manager_->Sync(true);
         persistence_manager_map_[table]->SaveSnapshot(*store);
         persistence_manager_map_[table]->ClearWAL();
     }
@@ -319,28 +318,8 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, std::size_
     stats_manager_map_[name] = std::move(stats_manager);
     metrics_manager_map_[name] = std::move(metrics_manager);
     cache_map_[name] = std::move(lru_cache);
-    replica_wal_offsets_map_[name] = 0;
 
-    vector_db::CreateRequest request;
-    request.set_table(name);
-    request.mutable_store_config()->set_vector_dimensionality(vector_dimensionality);
-    request.mutable_hnsw_index_config()->set_m(m);
-    request.mutable_hnsw_index_config()->set_m0(m0);
-    request.mutable_hnsw_index_config()->set_ef_construction(ef_construction);
-    request.mutable_hnsw_index_config()->set_ml(ml);
-    if (distance_metric == HNSWIndex::DistanceMetric::L2) {
-        request.mutable_hnsw_index_config()->set_distance_metric(vector_db::CreateRequest_HNSWIndexConfig_DistanceMetric_L2);
-    } else {
-        request.mutable_hnsw_index_config()->set_distance_metric(vector_db::CreateRequest_HNSWIndexConfig_DistanceMetric_COSINE);
-    }
-    request.mutable_cache_config()->set_cache_size(cache_size);
-
-    for (const auto& replica : replicas_) {
-        auto stub = vector_db::ReplicaManager::NewStub(grpc::CreateChannel(replica, grpc::InsecureChannelCredentials()));
-        vector_db::CreateResponse response;
-        grpc::ClientContext context;
-        grpc::Status status = stub->Create(&context, request, &response);
-    }
+    replica_manager_->SyncCreateTable(name, vector_dimensionality, m, m0, ef_construction, ml, distance_metric, cache_size);
 
     return true;
 }
@@ -371,7 +350,6 @@ bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, s
     stats_manager_map_[name] = std::move(stats_manager);
     metrics_manager_map_[name] = std::move(metrics_manager);
     cache_map_[name] = std::move(lru_cache);
-    replica_wal_offsets_map_[name] = 0;
 
     return true;
 }
@@ -393,16 +371,8 @@ bool Engine::DropTable(std::string name) {
     stats_manager_map_.erase(name);
     metrics_manager_map_.erase(name);
     cache_map_.erase(name);
-    replica_wal_offsets_map_.erase(name);
 
-    vector_db::DropRequest request;
-    request.set_table(name);
-    for (const auto& replica : replicas_) {
-        auto stub = vector_db::ReplicaManager::NewStub(grpc::CreateChannel(replica, grpc::InsecureChannelCredentials()));
-        vector_db::DropResponse response;
-        grpc::ClientContext context;
-        grpc::Status status = stub->Drop(&context, request, &response);
-    }
+    replica_manager_->SyncDropTable(name);
 
     return true;
 }
@@ -424,7 +394,6 @@ bool Engine::DropTableOnReplica(std::string name) {
     stats_manager_map_.erase(name);
     metrics_manager_map_.erase(name);
     cache_map_.erase(name);
-    replica_wal_offsets_map_.erase(name);
 
     return true;
 }
@@ -487,37 +456,6 @@ void Engine::Cleanup(const std::string& table_name, bool force) {
     }
 }
 
-void Engine::Sync(bool force) {
-    std::shared_lock lock(engine_mutex_);
-    if ((shutdown_ && !force)) {
-        return;
-    }
-
-    for (const auto& [table, persistence_manager] : persistence_manager_map_) {
-        vector_db::SyncRequest request;
-        std::vector<vector_db::WALEntry> entries = persistence_manager_map_[table]->SerializeWALEntries(replica_wal_offsets_map_[table]);
-        if (entries.empty()) {
-            continue;
-        }
-
-        for (const auto& entry : entries) {
-            *request.add_entry() = entry;
-        }
-
-        for (const auto& replica : replicas_) {
-            auto stub = vector_db::ReplicaManager::NewStub(grpc::CreateChannel(replica, grpc::InsecureChannelCredentials()));
-            vector_db::SyncResponse response;
-            grpc::ClientContext context;
-            grpc::Status status = stub->Sync(&context, request, &response);
-            if (!status.ok()) {
-                logger_->Error("error in updating replica: " + replica, metadata_.name);
-            }
-        }
-
-        replica_wal_offsets_map_[table] += entries.size();
-    }
-}
-
 void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
     std::unique_lock lock(engine_mutex_);
     std::unique_lock replica_lock(replica_mutex_);
@@ -543,6 +481,10 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
 
 Logger* Engine::GetLogger() const {
     return logger_.get();
+}
+
+const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>& Engine::GetPersistenceManagerMap() const {
+    return persistence_manager_map_;
 }
 
 } // namespace vector_db_engine

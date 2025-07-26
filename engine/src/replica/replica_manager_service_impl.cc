@@ -7,13 +7,13 @@
 
 namespace vector_db_engine {
 
-ReplicaManagerServiceImpl::ReplicaManagerServiceImpl(Engine* engine)
-    : engine_(engine)
+ReplicaManagerServiceImpl::ReplicaManagerServiceImpl(ReplicaManager* replica_manager)
+    : replica_manager_(replica_manager)
 {}
 
 grpc::Status ReplicaManagerServiceImpl::Sync(grpc::ServerContext* context, const vector_db::SyncRequest* request, vector_db::SyncResponse* response) {
     for (const auto& entry : request->entry()) {
-        engine_->ApplyWALEntry(entry);
+        replica_manager_->ApplyWALEntry(entry);
     }
     return grpc::Status::OK;
 }
@@ -33,12 +33,12 @@ grpc::Status ReplicaManagerServiceImpl::Create(grpc::ServerContext* context, con
     } else {
         distance_metric = HNSWIndex::DistanceMetric::Cosine;
     }
-    engine_->CreateTableOnReplica(name, vector_dimensionality, m, m0, ef_construction, ml, distance_metric, cache_size);
+    replica_manager_->CreateTableOnReplica(name, vector_dimensionality, m, m0, ef_construction, ml, distance_metric, cache_size);
     return grpc::Status::OK;
 }
 
 grpc::Status ReplicaManagerServiceImpl::Drop(grpc::ServerContext* context, const vector_db::DropRequest* request, vector_db::DropResponse* response) {
-    engine_->DropTableOnReplica(request->table());
+    replica_manager_->DropTableOnReplica(request->table());
     return grpc::Status::OK;
 }
 

@@ -57,17 +57,16 @@ public:
     void BackgroundCleanupLoop();
     void Cleanup(const std::string& table_name, bool force);
 
-    void Sync(bool force);
     void ApplyWALEntry(const vector_db::WALEntry& entry);
 
     Logger* GetLogger() const;
+    const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>& GetPersistenceManagerMap() const;
 
 private:
     Metadata metadata_;
     std::atomic<bool> shutdown_;
 
     std::vector<std::string> replicas_;
-    std::unordered_map<std::string, uint64_t> replica_wal_offsets_map_;
 
     std::unordered_map<std::string, std::unique_ptr<VectorStore>> store_map_;
     std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>> persistence_manager_map_;
