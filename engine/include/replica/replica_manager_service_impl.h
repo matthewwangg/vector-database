@@ -13,13 +13,14 @@ namespace vector_db_engine {
 
 class ReplicaManagerServiceImpl : public vector_db::ReplicaManager::Service {
 public:
-    explicit ReplicaManagerServiceImpl(Engine* engine);
+    explicit ReplicaManagerServiceImpl(ReplicaManager* replica_manager);
 
     grpc::Status Sync(grpc::ServerContext* context, const vector_db::SyncRequest* request, vector_db::SyncResponse* response) override;
+    grpc::Status Create(grpc::ServerContext* context, const vector_db::CreateRequest* request, vector_db::CreateResponse* response) override;
     grpc::Status Drop(grpc::ServerContext* context, const vector_db::DropRequest* request, vector_db::DropResponse* response) override;
 
 private:
-    Engine* engine_;
+    ReplicaManager* replica_manager_;
 };
 
 } // namespace vector_db_engine

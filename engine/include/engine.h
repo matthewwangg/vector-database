@@ -17,6 +17,7 @@
 #include "lru_cache.h"
 #include "metrics_manager.h"
 #include "persistence_manager.h"
+#include "replica_manager.h"
 #include "stats_manager.h"
 #include "thread_pool.h"
 #include "vector_store.h"
@@ -48,28 +49,24 @@ public:
     MetricsManager::Metrics GetMetrics(std::string table_name);
 
     bool CreateTable(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
-    bool CreateTableWithoutLock(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
+    bool CreateTableOnReplica(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
     bool DropTable(std::string name);
-    bool DropTableWithoutLock(std::string name);
+    bool DropTableOnReplica(std::string name);
     std::vector<std::string> ListTables();
 
     void BackgroundCleanupLoop();
     void Cleanup(const std::string& table_name, bool force);
 
-    void BackgroundSyncReplicasLoop();
-    void Sync(bool force);
-
-    void BackgroundWaitForSyncLoop();
     void ApplyWALEntry(const vector_db::WALEntry& entry);
 
     Logger* GetLogger() const;
+    const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>& GetPersistenceManagerMap() const;
 
 private:
     Metadata metadata_;
     std::atomic<bool> shutdown_;
 
     std::vector<std::string> replicas_;
-    std::unordered_map<std::string, uint64_t> replica_wal_offsets_map_;
 
     std::unordered_map<std::string, std::unique_ptr<VectorStore>> store_map_;
     std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>> persistence_manager_map_;
@@ -78,21 +75,19 @@ private:
     std::unordered_map<std::string, std::unique_ptr<Cache>> cache_map_;
 
     mutable std::shared_mutex engine_mutex_;
+    std::mutex replica_mutex_;
 
     float reindex_threshold_;
     bool use_cache_;
 
     std::unique_ptr<ThreadPool> thread_pool_;
     std::unique_ptr<Logger> logger_;
+    std::unique_ptr<ReplicaManager> replica_manager_;
 
     std::thread cleanup_thread_;
     std::atomic<bool> removed_;
     std::condition_variable cleanup_cv_;
     std::mutex cleanup_mutex_;
-
-    std::thread sync_thread_;
-    std::condition_variable sync_cv_;
-    std::mutex sync_mutex_;
 };
 
 } // namespace vector_db_engine
