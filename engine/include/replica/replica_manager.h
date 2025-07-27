@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -11,6 +12,7 @@
 
 #include "hnsw_index.h"
 #include "logger.h"
+#include "persistence_manager.h"
 
 #include "replica.pb.h"
 
@@ -20,27 +22,26 @@ class Engine;
 
 class ReplicaManager {
 public:
-    explicit ReplicaManager(Engine* engine, std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown);
+    explicit ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, const std::function<void(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, Logger* logger);
     ~ReplicaManager();
 
     void RunReplicaServer();
     void RunReplicaSyncLoop();
 
     void Sync(bool force);
-    void SyncCreateTable(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
-    void SyncDropTable(std::string name);
 
     void ApplyWALEntry(const vector_db::WALEntry& entry);
-    bool CreateTableOnReplica(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
-    bool DropTableOnReplica(std::string name);
 
 private:
-    Engine* engine_;
-
     std::string name_;
     std::atomic<bool>& shutdown_;
 
+    Logger* logger_;
+
     std::vector<std::string> replicas_;
+
+    std::function<void(const vector_db::WALEntry&)> apply_callback_;
+    std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback_;
 
     bool primary_;
     std::string sync_server_address_;

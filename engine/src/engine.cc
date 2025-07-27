@@ -63,8 +63,15 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     }();
 
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
-    logger_ = std::make_unique<RemoteLogger>("0.0.0.0:50051");
-    replica_manager_ = std::make_unique<ReplicaManager>(this, metadata_.name, metadata_.primary, sync_server_address, replicas, shutdown_);
+    logger_ = std::make_unique<LocalLogger>();
+    replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, sync_server_address, replicas, shutdown_,
+    [this](const vector_db::WALEntry& entry) {
+        this->ApplyWALEntry(entry);
+    },
+    [this]() -> const auto& {
+        return this->persistence_manager_map_;
+    },
+    logger_.get());
     cleaner_ = std::make_unique<Cleaner>(this, metadata_.name, shutdown_);
 
     for (const std::string& table : table_names) {
@@ -318,13 +325,10 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, std::size_
     metrics_manager_map_[name] = std::move(metrics_manager);
     cache_map_[name] = std::move(lru_cache);
 
-    replica_manager_->SyncCreateTable(name, vector_dimensionality, m, m0, ef_construction, ml, distance_metric, cache_size);
-
     return true;
 }
 
 bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size) {
-    std::unique_lock lock(replica_mutex_);
     if (shutdown_ || name.empty()) {
         return false;
     }
@@ -374,13 +378,10 @@ bool Engine::DropTable(std::string name) {
     metrics_manager_map_.erase(name);
     cache_map_.erase(name);
 
-    replica_manager_->SyncDropTable(name);
-
     return true;
 }
 
 bool Engine::DropTableOnReplica(std::string name) {
-    std::unique_lock lock(replica_mutex_);
     if (shutdown_ || name.empty()) {
         return false;
     }
@@ -446,7 +447,7 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
         bool ok = false;
         std::unique_lock replica_lock(replica_mutex_);
         if (metadata_.primary) {
-            ok = CreateTable(entry.table(), store_config.vector_dimensionality(), index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 ? HNSWIndex::DistanceMetric::L2 : HNSWIndex::DistanceMetric::Cosine),cache_config.cache_size());
+            ok = CreateTable(entry.table(), store_config.vector_dimensionality(), index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 ? HNSWIndex::DistanceMetric::L2 : HNSWIndex::DistanceMetric::Cosine), cache_config.cache_size());
         } else {
             ok = CreateTableOnReplica(entry.table(), store_config.vector_dimensionality(), index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 ? HNSWIndex::DistanceMetric::L2 : HNSWIndex::DistanceMetric::Cosine),cache_config.cache_size());
         }
@@ -493,10 +494,6 @@ Logger* Engine::GetLogger() const {
 
 const std::unordered_map<std::string, std::unique_ptr<VectorStore>>& Engine::GetStoreMap() const {
     return store_map_;
-}
-
-const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>& Engine::GetPersistenceManagerMap() const {
-    return persistence_manager_map_;
 }
 
 const std::unordered_map<std::string, std::unique_ptr<StatsManager>>& Engine::GetStatsManagerMap() const {

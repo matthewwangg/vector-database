@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -10,7 +11,7 @@
 
 #include <grpcpp/grpcpp.h>
 
-#include "engine.h"
+#include "persistence_manager.h"
 
 #include "replica_manager_service_impl.h"
 #include "replica.pb.h"
@@ -20,13 +21,15 @@ namespace vector_db_engine {
 constexpr int kSyncInterval = 90;
 constexpr int kShutdownCheckInterval = 1000;
 
-ReplicaManager::ReplicaManager(Engine* engine, std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown)
-    : engine_(engine),
-      name_(name),
+ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, const std::function<void(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, Logger* logger)
+    : name_(name),
       primary_(primary),
       sync_server_address_(sync_server_address),
       replicas_(replicas),
-      shutdown_(shutdown)
+      shutdown_(shutdown),
+      apply_callback_(apply_callback),
+      get_persistence_manager_map_callback_(get_persistence_manager_map_callback),
+      logger_(logger)
 {
     if (primary_ && !replicas_.empty()) {
         sync_thread_ = std::thread(&ReplicaManager::RunReplicaSyncLoop, this);
@@ -43,7 +46,7 @@ ReplicaManager::~ReplicaManager() {
 
 void ReplicaManager::RunReplicaServer() {
     if (sync_server_address_.empty()) {
-        engine_->GetLogger()->Warn("no sync server address specified", name_);
+        logger_->Warn("no sync server address specified", name_);
         return;
     }
 
@@ -53,14 +56,14 @@ void ReplicaManager::RunReplicaServer() {
     builder.AddListeningPort(sync_server_address_, grpc::InsecureServerCredentials());
     builder.RegisterService(&replica_manager_service);
 
-    engine_->GetLogger()->Info("replica sync server running on " + sync_server_address_, name_);
+    logger_->Info("replica sync server running on " + sync_server_address_, name_);
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
     std::thread shutdown_thread([&server, this]() {
         while (!shutdown_) {
             std::this_thread::sleep_for(std::chrono::milliseconds(kShutdownCheckInterval));
         }
-        engine_->GetLogger()->Info("replica sync server shutting down...", name_);
+        logger_->Info("replica sync server shutting down...", name_);
         server->Shutdown();
     });
 
@@ -80,7 +83,7 @@ void ReplicaManager::RunReplicaSyncLoop() {
         Sync(false);
         auto end = std::chrono::steady_clock::now();
         auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        engine_->GetLogger()->Info("sync completed in " + std::to_string(duration_ms) + " ms", name_);
+        logger_->Info("sync completed in " + std::to_string(duration_ms) + " ms", name_);
     }
 }
 
@@ -89,7 +92,7 @@ void ReplicaManager::Sync(bool force) {
         return;
     }
 
-    const auto& persistence_manager_map = engine_->GetPersistenceManagerMap();
+    const auto& persistence_manager_map = get_persistence_manager_map_callback_();
     for (const auto& [table, persistence_manager] : persistence_manager_map) {
         vector_db::SyncRequest request;
         std::vector<vector_db::WALEntry> entries = persistence_manager->SerializeWALEntries(wal_offsets_map_[table]);
@@ -107,7 +110,7 @@ void ReplicaManager::Sync(bool force) {
             grpc::ClientContext context;
             grpc::Status status = stub->Sync(&context, request, &response);
             if (!status.ok()) {
-                engine_->GetLogger()->Error("error in updating replica: " + replica, name_);
+                logger_->Error("error in updating replica: " + replica, name_);
             }
         }
 
@@ -115,50 +118,8 @@ void ReplicaManager::Sync(bool force) {
     }
 }
 
-void ReplicaManager::SyncCreateTable(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size) {
-    vector_db::CreateRequest request;
-    request.set_table(name);
-    request.mutable_store_config()->set_vector_dimensionality(vector_dimensionality);
-    request.mutable_hnsw_index_config()->set_m(m);
-    request.mutable_hnsw_index_config()->set_m0(m0);
-    request.mutable_hnsw_index_config()->set_ef_construction(ef_construction);
-    request.mutable_hnsw_index_config()->set_ml(ml);
-    if (distance_metric == HNSWIndex::DistanceMetric::L2) {
-        request.mutable_hnsw_index_config()->set_distance_metric(vector_db::CreateRequest_HNSWIndexConfig_DistanceMetric_L2);
-    } else {
-        request.mutable_hnsw_index_config()->set_distance_metric(vector_db::CreateRequest_HNSWIndexConfig_DistanceMetric_COSINE);
-    }
-    request.mutable_cache_config()->set_cache_size(cache_size);
-
-    for (const auto& replica : replicas_) {
-        auto stub = vector_db::ReplicaManager::NewStub(grpc::CreateChannel(replica, grpc::InsecureChannelCredentials()));
-        vector_db::CreateResponse response;
-        grpc::ClientContext context;
-        grpc::Status status = stub->Create(&context, request, &response);
-    }
-}
-
-void ReplicaManager::SyncDropTable(std::string name) {
-    vector_db::DropRequest request;
-    request.set_table(name);
-    for (const auto& replica : replicas_) {
-        auto stub = vector_db::ReplicaManager::NewStub(grpc::CreateChannel(replica, grpc::InsecureChannelCredentials()));
-        vector_db::DropResponse response;
-        grpc::ClientContext context;
-        grpc::Status status = stub->Drop(&context, request, &response);
-    }
-}
-
 void ReplicaManager::ApplyWALEntry(const vector_db::WALEntry& entry) {
-    engine_->ApplyWALEntry(entry);
-}
-
-bool ReplicaManager::CreateTableOnReplica(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size) {
-    return engine_->CreateTableOnReplica(name, vector_dimensionality, m, m0, ef_construction, ml, distance_metric, cache_size);
-}
-
-bool ReplicaManager::DropTableOnReplica(std::string name) {
-    return engine_->DropTableOnReplica(name);
+    apply_callback_(entry);
 }
 
 } // namespace vector_db_engine

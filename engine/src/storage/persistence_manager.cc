@@ -357,9 +357,6 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(i
         std::string command;
         stream >> command;
 
-        Id id;
-        stream >> id;
-
         if (command == "insert") {
             entry.set_type(vector_db::WALEntry::INSERT);
 
