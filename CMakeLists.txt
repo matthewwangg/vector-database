@@ -35,7 +35,6 @@ add_executable(vector_db_tests
 
 target_link_libraries(vector_db_tests
         PRIVATE
-        engine
         server
         GTest::gmock_main
 )

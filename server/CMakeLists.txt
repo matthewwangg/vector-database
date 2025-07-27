@@ -4,10 +4,6 @@ add_executable(vector_db_server
 
 target_link_libraries(vector_db_server
         server
-        engine
-        grpc++
-        grpc
-        protobuf
 )
 
 target_include_directories(vector_db_server PUBLIC
@@ -25,9 +21,6 @@ target_include_directories(server PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/proto
 )
 
-target_link_libraries(server PRIVATE
+target_link_libraries(server PUBLIC
         engine
-        grpc++
-        grpc
-        protobuf
 )

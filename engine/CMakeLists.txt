@@ -38,4 +38,8 @@ target_link_libraries(engine PRIVATE
         grpc++
         grpc
         protobuf
+        gpr
+        absl_synchronization
+        absl_time
+        absl_strings
 )
