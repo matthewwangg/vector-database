@@ -271,6 +271,37 @@ void VectorPersistenceManager::ReplayWAL(const std::function<void(const vector_d
             Id id;
             stream >> id;
             entry.mutable_remove_config()->set_id(id);
+            callback(entry);
+        }
+        if (command == "create")  {
+            entry.set_type(vector_db::WALEntry::CREATE);
+
+            int vector_dimensionality;
+            std::size_t m;
+            std::size_t m0;
+            std::size_t ef_construction;
+            float ml;
+            std::string distance_metric_string;
+            std::size_t cache_size;
+
+            stream >> vector_dimensionality;
+            stream >> m;
+            stream >> m0;
+            stream >> ef_construction;
+            stream >> ml;
+            stream >> distance_metric_string;
+            stream >> cache_size;
+
+            entry.mutable_create_config()->mutable_store_config()->set_vector_dimensionality(vector_dimensionality);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_m(m);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_m0(m0);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_ef_construction(ef_construction);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_ml(ml);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric((distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 : vector_db::WALEntry::CreateConfig::HNSWIndexConfig::COSINE));
+            entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
+        }
+        if (command == "drop") {
+            entry.set_type(vector_db::WALEntry::DROP);
         }
         callback(entry);
     }
@@ -357,6 +388,36 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(i
             Id id;
             stream >> id;
             entry.mutable_remove_config()->set_id(id);
+        }
+        if (command == "create")  {
+            entry.set_type(vector_db::WALEntry::CREATE);
+
+            int vector_dimensionality;
+            std::size_t m;
+            std::size_t m0;
+            std::size_t ef_construction;
+            float ml;
+            std::string distance_metric_string;
+            std::size_t cache_size;
+
+            stream >> vector_dimensionality;
+            stream >> m;
+            stream >> m0;
+            stream >> ef_construction;
+            stream >> ml;
+            stream >> distance_metric_string;
+            stream >> cache_size;
+
+            entry.mutable_create_config()->mutable_store_config()->set_vector_dimensionality(vector_dimensionality);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_m(m);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_m0(m0);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_ef_construction(ef_construction);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_ml(ml);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric((distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 : vector_db::WALEntry::CreateConfig::HNSWIndexConfig::COSINE));
+            entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
+        }
+        if (command == "drop") {
+            entry.set_type(vector_db::WALEntry::DROP);
         }
 
         entries.push_back(entry);
