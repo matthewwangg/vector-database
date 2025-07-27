@@ -18,13 +18,64 @@ message WALEntry {
   enum Type {
     INSERT = 0;
     REMOVE = 1;
+    CREATE = 2;
+    DROP = 3;
   }
 
   Type type = 1;
   string table = 2;
-  uint64 id = 3;
-  repeated float vector = 4;
-  string content = 5;
+
+  message InsertConfig {
+    uint64 id = 1;
+    repeated float vector = 2;
+    string content = 3;
+  }
+
+  message RemoveConfig {
+    uint64 id = 1;
+  }
+
+  message CreateConfig {
+    message StoreConfig {
+      int32 vector_dimensionality = 1;
+    }
+
+    StoreConfig store_config = 1;
+
+    message HNSWIndexConfig {
+      uint64 m = 1;
+      uint64 m0 = 2;
+      uint64 ef_construction = 3;
+      float ml = 4;
+      int32 vector_dimensionality = 5;
+
+      enum DistanceMetric {
+        L2 = 0;
+        COSINE = 1;
+      }
+
+      DistanceMetric distance_metric = 6;
+    }
+
+    oneof index_config {
+      HNSWIndexConfig hnsw_index_config = 2;
+    }
+
+    message CacheConfig {
+      uint64 cache_size = 1;
+    }
+
+    CacheConfig cache_config = 3;
+  }
+
+  message DropConfig {}
+
+  oneof config {
+      InsertConfig insert_config = 3;
+      RemoveConfig remove_config = 4;
+      CreateConfig create_config = 5;
+      DropConfig drop_config = 6;
+  }
 }
 
 message DropRequest {

@@ -74,12 +74,11 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
         }
         std::unique_ptr<VectorStore> loaded_store = persistence_manager_map_[table]->LoadSnapshot();
         if (loaded_store) {
-            persistence_manager_map_[table]->ReplayWAL(*loaded_store);
             store_map_[table] = std::move(loaded_store);
-        } else {
-            persistence_manager_map_[table]->ReplayWAL(*store_map_[table]);
         }
-
+        persistence_manager_map_[table]->ReplayWAL([this](const vector_db::WALEntry& entry) {
+            this->ApplyWALEntry(entry);
+        });
         stats_manager_map_[table]->Set(StatsManager::StatType::VECTOR, store_map_[table]->GetStore().size());
     }
 }
@@ -301,6 +300,11 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, std::size_
     std::string index_snapshot = name + "_" + kIndexSnapshotFilename;
     std::string write_ahead_log = name + "_" + kWriteAheadLogFilename;
 
+    {
+        auto temporary_persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
+        temporary_persistence_manager->AppendCreate(vector_dimensionality, m, m0, ef_construction, ml, distance_metric, cache_size);
+    }
+
     auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality);
     auto vector_store = std::make_unique<VectorStore>(std::move(hnsw_index), vector_dimensionality);
     auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
@@ -358,6 +362,9 @@ bool Engine::DropTable(std::string name) {
     if (!store_map_.contains(name) || !persistence_manager_map_.contains(name) || !stats_manager_map_.contains(name) || !metrics_manager_map_.contains(name) || !cache_map_.contains(name)) {
         return false;
     }
+
+    persistence_manager_map_[name]->AppendDrop();
+    replica_manager_->Sync(true);
 
     persistence_manager_map_[name]->Clear();
 
@@ -430,20 +437,48 @@ void Engine::Cleanup(const std::string& table_name, bool force) {
 }
 
 void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
+    if (entry.type() == vector_db::WALEntry::CREATE) {
+        const auto& config = entry.create_config();
+        const auto& store_config = config.store_config();
+        const auto& index_config = config.hnsw_index_config();
+        const auto& cache_config = config.cache_config();
+
+        bool ok = false;
+        std::unique_lock replica_lock(replica_mutex_);
+        if (metadata_.primary) {
+            ok = CreateTable(entry.table(), store_config.vector_dimensionality(), index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 ? HNSWIndex::DistanceMetric::L2 : HNSWIndex::DistanceMetric::Cosine),cache_config.cache_size());
+        } else {
+            ok = CreateTableOnReplica(entry.table(), store_config.vector_dimensionality(), index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 ? HNSWIndex::DistanceMetric::L2 : HNSWIndex::DistanceMetric::Cosine),cache_config.cache_size());
+        }
+    }
+    if (entry.type() == vector_db::WALEntry::DROP) {
+        const auto& config = entry.drop_config();
+        bool ok = false;
+        std::unique_lock replica_lock(replica_mutex_);
+        if (metadata_.primary) {
+            ok = DropTable(entry.table());
+        } else {
+            ok = DropTableOnReplica(entry.table());
+        }
+    }
+
     std::unique_lock lock(engine_mutex_);
-    std::unique_lock replica_lock(replica_mutex_);
     if (!store_map_.contains(entry.table()) || !stats_manager_map_.contains(entry.table())) {
         return;
     }
     if (entry.type() == vector_db::WALEntry::INSERT) {
-        Vector vector(entry.vector().begin(), entry.vector().end());
-        bool ok = store_map_[entry.table()]->Insert(entry.id(), vector, entry.content());
+        const auto& config = entry.insert_config();
+        Vector vector(config.vector().begin(), config.vector().end());
+        std::unique_lock replica_lock(replica_mutex_);
+        bool ok = store_map_[entry.table()]->Insert(config.id(), vector, config.content());
         if (ok) {
             stats_manager_map_[entry.table()]->Increment(StatsManager::StatType::VECTOR);
         }
     }
     if (entry.type() == vector_db::WALEntry::REMOVE) {
-        bool ok = store_map_[entry.table()]->Remove(entry.id());
+        const auto& config = entry.remove_config();
+        std::unique_lock replica_lock(replica_mutex_);
+        bool ok = store_map_[entry.table()]->Remove(config.id());
         if (ok) {
             stats_manager_map_[entry.table()]->SetRemovedFlag(true);
             stats_manager_map_[entry.table()]->Increment(StatsManager::StatType::DELETED);

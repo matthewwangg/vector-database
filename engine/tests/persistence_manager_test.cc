@@ -4,6 +4,7 @@
 #include "vector_store.h"
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -78,7 +79,10 @@ TEST_F(PersistenceManagerTest, ReplayWAL) {
     persistence_manager_->AppendInsert(1, {0.5f, 0.4f, 0.6f, 0.2f}, "test_content_1");
     persistence_manager_->AppendInsert(2, {0.5f, 0.4f, 0.6f, 0.2f}, "test_content_2");
 
-    persistence_manager_->ReplayWAL(*store_);
+    persistence_manager_->ReplayWAL([this](const vector_db::WALEntry& entry) {
+        Vector vector(entry.insert_config().vector().begin(), entry.insert_config().vector().end());
+        store_->Insert(entry.insert_config().id(), vector, entry.insert_config().content());
+    });
 
     auto results = store_->Search({0.5f, 0.4f, 0.6f, 0.2f}, 2, 10);
     EXPECT_THAT(results, ::testing::UnorderedElementsAre(MatchData(1, std::vector<float>{0.5f, 0.4f, 0.6f, 0.2f}, "test_content_1"), MatchData(2, std::vector<float>{0.5f, 0.4f, 0.6f, 0.2f}, "test_content_2")));

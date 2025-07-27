@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -210,7 +211,19 @@ void VectorPersistenceManager::AppendRemove(Id id) {
     wal_out_.flush();
 }
 
-void VectorPersistenceManager::ReplayWAL(VectorStore& store) {
+void VectorPersistenceManager::AppendCreate(int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size) {
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+    wal_out_ << "create " << vector_dimensionality << " " <<  m << " " << m0 << " " << ef_construction << " " << ml << " " << (distance_metric == HNSWIndex::DistanceMetric::L2 ? "L2" : "COSINE") << " " << cache_size << "\n";
+    wal_out_.flush();
+}
+
+void VectorPersistenceManager::AppendDrop() {
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+    wal_out_ << "drop" << "\n";
+    wal_out_.flush();
+}
+
+void VectorPersistenceManager::ReplayWAL(const std::function<void(const vector_db::WALEntry&)>& callback) {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
 
     bool replay = false;
@@ -222,18 +235,24 @@ void VectorPersistenceManager::ReplayWAL(VectorStore& store) {
 
     std::string line;
     while (std::getline(wal_in, line)) {
+        vector_db::WALEntry entry;
+        entry.set_table(table_name_);
         replay = true;
+
         std::istringstream stream(line);
         std::string command;
         stream >> command;
 
-        Id id;
-        stream >> id;
         if (command == "insert") {
-            Vector vector;
+            entry.set_type(vector_db::WALEntry::INSERT);
+
+            Id id;
+            stream >> id;
+            entry.mutable_insert_config()->set_id(id);
+
             float value;
             while (stream >> value)  {
-                vector.push_back(value);
+                entry.mutable_insert_config()->add_vector(value);
             }
 
             stream.clear();
@@ -244,11 +263,47 @@ void VectorPersistenceManager::ReplayWAL(VectorStore& store) {
             if (content.starts_with("| ")) {
                 content = content.substr(2);
             }
-            store.Insert(id, vector, content);
+            entry.mutable_insert_config()->set_content(content);
         }
         if (command == "remove") {
-            store.Remove(id);
+            entry.set_type(vector_db::WALEntry::REMOVE);
+
+            Id id;
+            stream >> id;
+            entry.mutable_remove_config()->set_id(id);
+            callback(entry);
         }
+        if (command == "create")  {
+            entry.set_type(vector_db::WALEntry::CREATE);
+
+            int vector_dimensionality;
+            std::size_t m;
+            std::size_t m0;
+            std::size_t ef_construction;
+            float ml;
+            std::string distance_metric_string;
+            std::size_t cache_size;
+
+            stream >> vector_dimensionality;
+            stream >> m;
+            stream >> m0;
+            stream >> ef_construction;
+            stream >> ml;
+            stream >> distance_metric_string;
+            stream >> cache_size;
+
+            entry.mutable_create_config()->mutable_store_config()->set_vector_dimensionality(vector_dimensionality);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_m(m);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_m0(m0);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_ef_construction(ef_construction);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_ml(ml);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric((distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 : vector_db::WALEntry::CreateConfig::HNSWIndexConfig::COSINE));
+            entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
+        }
+        if (command == "drop") {
+            entry.set_type(vector_db::WALEntry::DROP);
+        }
+        callback(entry);
     }
 
     if (!replay) {
@@ -304,19 +359,17 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(i
 
         Id id;
         stream >> id;
-        entry.set_id(id);
 
         if (command == "insert") {
             entry.set_type(vector_db::WALEntry::INSERT);
 
-            Vector vector;
+            Id id;
+            stream >> id;
+            entry.mutable_insert_config()->set_id(id);
+
             float value;
             while (stream >> value)  {
-                vector.push_back(value);
-            }
-
-            for (float value : vector) {
-                entry.add_vector(value);
+                entry.mutable_insert_config()->add_vector(value);
             }
 
             stream.clear();
@@ -327,10 +380,44 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(i
             if (content.starts_with("| ")) {
                 content = content.substr(2);
             }
-            entry.set_content(content);
+            entry.mutable_insert_config()->set_content(content);
         }
         if (command == "remove") {
             entry.set_type(vector_db::WALEntry::REMOVE);
+
+            Id id;
+            stream >> id;
+            entry.mutable_remove_config()->set_id(id);
+        }
+        if (command == "create")  {
+            entry.set_type(vector_db::WALEntry::CREATE);
+
+            int vector_dimensionality;
+            std::size_t m;
+            std::size_t m0;
+            std::size_t ef_construction;
+            float ml;
+            std::string distance_metric_string;
+            std::size_t cache_size;
+
+            stream >> vector_dimensionality;
+            stream >> m;
+            stream >> m0;
+            stream >> ef_construction;
+            stream >> ml;
+            stream >> distance_metric_string;
+            stream >> cache_size;
+
+            entry.mutable_create_config()->mutable_store_config()->set_vector_dimensionality(vector_dimensionality);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_m(m);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_m0(m0);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_ef_construction(ef_construction);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_ml(ml);
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric((distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 : vector_db::WALEntry::CreateConfig::HNSWIndexConfig::COSINE));
+            entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
+        }
+        if (command == "drop") {
+            entry.set_type(vector_db::WALEntry::DROP);
         }
 
         entries.push_back(entry);
