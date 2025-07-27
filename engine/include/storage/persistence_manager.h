@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <fstream>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -31,7 +32,7 @@ public:
     void AppendCreate(int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
     void AppendDrop();
 
-    void ReplayWAL(VectorStore& store);
+    void ReplayWAL(const std::function<void(const vector_db::WALEntry&)>& callback);
     void ClearWAL();
     void Clear();
 

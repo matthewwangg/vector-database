@@ -74,12 +74,11 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
         }
         std::unique_ptr<VectorStore> loaded_store = persistence_manager_map_[table]->LoadSnapshot();
         if (loaded_store) {
-            persistence_manager_map_[table]->ReplayWAL(*loaded_store);
             store_map_[table] = std::move(loaded_store);
-        } else {
-            persistence_manager_map_[table]->ReplayWAL(*store_map_[table]);
         }
-
+        persistence_manager_map_[table]->ReplayWAL([this](const vector_db::WALEntry& entry) {
+            this->ApplyWALEntry(entry);
+        });
         stats_manager_map_[table]->Set(StatsManager::StatType::VECTOR, store_map_[table]->GetStore().size());
     }
 }
@@ -436,14 +435,14 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
         return;
     }
     if (entry.type() == vector_db::WALEntry::INSERT) {
-        Vector vector(entry.vector().begin(), entry.vector().end());
-        bool ok = store_map_[entry.table()]->Insert(entry.id(), vector, entry.content());
+        Vector vector(entry.insert_config().vector().begin(), entry.insert_config().vector().end());
+        bool ok = store_map_[entry.table()]->Insert(entry.insert_config().id(), vector, entry.insert_config().content());
         if (ok) {
             stats_manager_map_[entry.table()]->Increment(StatsManager::StatType::VECTOR);
         }
     }
     if (entry.type() == vector_db::WALEntry::REMOVE) {
-        bool ok = store_map_[entry.table()]->Remove(entry.id());
+        bool ok = store_map_[entry.table()]->Remove(entry.remove_config().id());
         if (ok) {
             stats_manager_map_[entry.table()]->SetRemovedFlag(true);
             stats_manager_map_[entry.table()]->Increment(StatsManager::StatType::DELETED);
