@@ -18,6 +18,7 @@ RUN protoc --proto_path=engine/proto \
     --cpp_out=engine/proto \
     --grpc_out=engine/proto \
     --plugin=protoc-gen-grpc=/usr/bin/grpc_cpp_plugin \
+    --experimental_allow_proto3_optional \
     engine/proto/*.proto && \
     protoc --proto_path=server/proto \
         --cpp_out=server/proto \
