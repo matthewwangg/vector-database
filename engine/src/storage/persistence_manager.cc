@@ -210,6 +210,18 @@ void VectorPersistenceManager::AppendRemove(Id id) {
     wal_out_.flush();
 }
 
+void VectorPersistenceManager::AppendCreate(int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size) {
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+    wal_out_ << "create " << vector_dimensionality << " " <<  m << " " << m0 << " " << ef_construction << " " << ml << " " << (distance_metric == HNSWIndex::DistanceMetric::L2 ? "L2" : "COSINE") << " " << cache_size << "\n";
+    wal_out_.flush();
+}
+
+void VectorPersistenceManager::AppendDrop() {
+    std::lock_guard<std::mutex> lock(wal_log_mutex_);
+    wal_out_ << "drop" << "\n";
+    wal_out_.flush();
+}
+
 void VectorPersistenceManager::ReplayWAL(VectorStore& store) {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
 

@@ -40,7 +40,7 @@ message WALEntry {
       int32 vector_dimensionality = 1;
     }
 
-    StoreConfig store_config = 2;
+    StoreConfig store_config = 1;
 
     message HNSWIndexConfig {
       uint64 m = 1;
@@ -58,14 +58,14 @@ message WALEntry {
     }
 
     oneof index_config {
-      HNSWIndexConfig hnsw_index_config = 3;
+      HNSWIndexConfig hnsw_index_config = 2;
     }
 
     message CacheConfig {
       uint64 cache_size = 1;
     }
 
-    CacheConfig cache_config = 4;
+    CacheConfig cache_config = 3;
   }
 
   message DropConfig {}
