@@ -74,10 +74,10 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
         index_snapshot.set_entry_point(index->GetEntryPoint().value());
     }
 
-    if (index->GetMetric() == HNSWIndex::DistanceMetric::L2) {
+    if (index->GetMetric() == VectorIndex::DistanceMetric::L2) {
         index_snapshot.set_distance_metric(vector_db::IndexSnapshot::L2);
     }
-    if (index->GetMetric() == HNSWIndex::DistanceMetric::Cosine) {
+    if (index->GetMetric() == VectorIndex::DistanceMetric::Cosine) {
         index_snapshot.set_distance_metric(vector_db::IndexSnapshot::COSINE);
     }
 
@@ -138,12 +138,12 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
     int max_level = index_snapshot.max_level();
     std::optional<Id> entry_point = index_snapshot.entry_point();
 
-    HNSWIndex::DistanceMetric distance_metric;
+    VectorIndex::DistanceMetric distance_metric;
     if (index_snapshot.distance_metric() == vector_db::IndexSnapshot::L2) {
-        distance_metric = HNSWIndex::DistanceMetric::L2;
+        distance_metric = VectorIndex::DistanceMetric::L2;
     }
     if (index_snapshot.distance_metric() == vector_db::IndexSnapshot::COSINE) {
-        distance_metric = HNSWIndex::DistanceMetric::Cosine;
+        distance_metric = VectorIndex::DistanceMetric::Cosine;
     }
 
     std::unordered_map<Id, HNSWIndex::Node> reconstructed_nodes;
@@ -211,9 +211,9 @@ void VectorPersistenceManager::AppendRemove(Id id) {
     wal_out_.flush();
 }
 
-void VectorPersistenceManager::AppendCreate(int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size) {
+void VectorPersistenceManager::AppendCreate(int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::VectorIndex::DistanceMetric distance_metric, std::size_t cache_size) {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
-    wal_out_ << "create " << vector_dimensionality << " " <<  m << " " << m0 << " " << ef_construction << " " << ml << " " << (distance_metric == HNSWIndex::DistanceMetric::L2 ? "L2" : "COSINE") << " " << cache_size << "\n";
+    wal_out_ << "create " << vector_dimensionality << " " <<  m << " " << m0 << " " << ef_construction << " " << ml << " " << (distance_metric == VectorIndex::DistanceMetric::L2 ? "L2" : "COSINE") << " " << cache_size << "\n";
     wal_out_.flush();
 }
 

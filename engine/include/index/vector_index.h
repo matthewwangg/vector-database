@@ -11,6 +11,11 @@ using Vector = std::vector<float>;
 
 class VectorIndex {
 public:
+    enum class DistanceMetric {
+        L2,
+        Cosine
+    };
+
     virtual ~VectorIndex() = default;
 
     virtual void Insert(Id id, const Vector& vector) = 0;

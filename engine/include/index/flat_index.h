@@ -11,11 +11,6 @@ namespace vector_db_engine {
 
 class FlatIndex : public VectorIndex {
 public:
-    enum class DistanceMetric {
-        L2,
-        Cosine
-    };
-
     explicit FlatIndex(DistanceMetric metric);
 
     void Insert(Id id, const Vector& vector) override;
