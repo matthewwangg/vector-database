@@ -33,6 +33,9 @@ public:
         std::string name;
         bool primary;
         std::string sync_server_address;
+        std::vector<std::string> replicas;
+        float reindex_threshold;
+        bool use_cache;
     };
 
     explicit Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string primary_address = "", std::vector<std::string> replicas = {});
@@ -64,8 +67,6 @@ private:
     Metadata metadata_;
     std::atomic<bool> shutdown_;
 
-    std::vector<std::string> replicas_;
-
     std::unordered_map<std::string, std::unique_ptr<VectorStore>> store_map_;
     std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>> persistence_manager_map_;
     std::unordered_map<std::string, std::unique_ptr<StatsManager>> stats_manager_map_;
@@ -74,9 +75,6 @@ private:
 
     mutable std::shared_mutex engine_mutex_;
     std::mutex replica_mutex_;
-
-    float reindex_threshold_;
-    bool use_cache_;
 
     std::unique_ptr<ThreadPool> thread_pool_;
     std::unique_ptr<Logger> logger_;

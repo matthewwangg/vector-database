@@ -34,15 +34,15 @@ inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
 inline const std::string kWriteAheadLogFilename = "wal.log";
 
 Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string sync_server_address, std::vector<std::string> replicas)
-    : reindex_threshold_(reindex_threshold),
-      use_cache_(use_cache),
-      replicas_(replicas),
-      shutdown_(false)
+    : shutdown_(false)
 {
     metadata_ = Metadata{
         .name = name,
         .primary = primary,
-        .sync_server_address = sync_server_address
+        .sync_server_address = sync_server_address,
+        .replicas = replicas,
+        .reindex_threshold = reindex_threshold,
+        .use_cache = use_cache,
     };
 
     std::vector<std::string> table_names = [&]() {
@@ -65,7 +65,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
     logger_ = std::make_unique<LocalLogger>();
 
-    replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, sync_server_address, replicas, shutdown_,
+    replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, shutdown_,
     [this](const vector_db::WALEntry& entry) {
         this->ApplyWALEntry(entry);
     },
@@ -227,7 +227,7 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
         return hash;
     }();
 
-    if (use_cache_) {
+    if (metadata_.use_cache) {
         std::optional<Cache::CacheEntry> cache_entry = cache_map_[table_name]->Get(hash_key);
         if (cache_entry.has_value()) {
             metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::CACHE_HIT, 1);
@@ -266,7 +266,7 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
         results.push_back(data_vector.get());
     }
 
-    if (use_cache_) {
+    if (metadata_.use_cache) {
         Cache::CacheEntry new_entry = [&]() {
             Cache::CacheEntry entry;
             entry.data.reserve(results.size());
@@ -433,7 +433,7 @@ void Engine::Cleanup(const std::string& table_name, bool force) {
     if (stats.vector_count + stats.stale_count - stats.deleted_count > 0) {
         ratio = static_cast<float>(stats.stale_count) / static_cast<float>(stats.vector_count + stats.stale_count - stats.deleted_count);
     }
-    bool reindex = ratio > reindex_threshold_;
+    bool reindex = ratio > metadata_.reindex_threshold;
 
     store_map_[table_name]->Cleanup(reindex);
     metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::CLEANUP, 1);
