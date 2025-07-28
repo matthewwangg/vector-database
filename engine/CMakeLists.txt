@@ -12,6 +12,7 @@ add_library(engine
         src/stats/stats_manager.cc
         src/replica/replica_manager.cc
         src/cleaner/cleaner.cc
+        src/index/flat_index.cc
         proto/storage.pb.cc
         proto/replica.pb.cc
         proto/replica.grpc.pb.cc
