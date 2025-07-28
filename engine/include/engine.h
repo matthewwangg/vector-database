@@ -59,9 +59,6 @@ public:
     void ApplyWALEntry(const vector_db::WALEntry& entry);
 
     Logger* GetLogger() const;
-    const std::unordered_map<std::string, std::unique_ptr<VectorStore>>& GetStoreMap() const;
-    const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>& GetPersistenceManagerMap() const;
-    const std::unordered_map<std::string, std::unique_ptr<StatsManager>>& GetStatsManagerMap() const;
 
 private:
     Metadata metadata_;

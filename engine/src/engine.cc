@@ -64,6 +64,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
 
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
     logger_ = std::make_unique<LocalLogger>();
+
     replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, sync_server_address, replicas, shutdown_,
     [this](const vector_db::WALEntry& entry) {
         this->ApplyWALEntry(entry);
@@ -72,7 +73,17 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
         return this->persistence_manager_map_;
     },
     logger_.get());
-    cleaner_ = std::make_unique<Cleaner>(this, metadata_.name, shutdown_);
+    cleaner_ = std::make_unique<Cleaner>(metadata_.name, shutdown_,
+    [this](const std::string& table_name, bool force) {
+        this->Cleanup(table_name, force);
+    },
+    [this]() -> const auto& {
+        return this->store_map_;
+    },
+    [this]() -> const auto& {
+     return this->stats_manager_map_;
+    },
+    logger_.get());
 
     for (const std::string& table : table_names) {
         bool ok = CreateTable(table, 384, 16, 32, 64, 1.0f, vector_db_engine::HNSWIndex::DistanceMetric::L2, 32);
@@ -490,14 +501,6 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
 
 Logger* Engine::GetLogger() const {
     return logger_.get();
-}
-
-const std::unordered_map<std::string, std::unique_ptr<VectorStore>>& Engine::GetStoreMap() const {
-    return store_map_;
-}
-
-const std::unordered_map<std::string, std::unique_ptr<StatsManager>>& Engine::GetStatsManagerMap() const {
-    return stats_manager_map_;
 }
 
 } // namespace vector_db_engine

@@ -18,8 +18,6 @@
 
 namespace vector_db_engine {
 
-class Engine;
-
 class ReplicaManager {
 public:
     explicit ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, const std::function<void(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, Logger* logger);
