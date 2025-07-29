@@ -458,9 +458,9 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
         bool ok = false;
         std::unique_lock replica_lock(replica_mutex_);
         if (metadata_.primary) {
-            ok = CreateTable(entry.table(), store_config.vector_dimensionality(), index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine), cache_config.cache_size());
+            ok = CreateTable(entry.table(), store_config.vector_dimensionality(), index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine), cache_config.cache_size());
         } else {
-            ok = CreateTableOnReplica(entry.table(), store_config.vector_dimensionality(), index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine),cache_config.cache_size());
+            ok = CreateTableOnReplica(entry.table(), store_config.vector_dimensionality(), index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine),cache_config.cache_size());
         }
     }
     if (entry.type() == vector_db::WALEntry::DROP) {

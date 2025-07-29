@@ -162,7 +162,7 @@ grpc::Status VectorDatabaseServiceImpl::CreateTable(grpc::ServerContext* context
     }
 
     vector_db_engine::VectorIndex::DistanceMetric distance_metric;
-    if (request->hnsw_index_config().distance_metric() == vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2) {
+    if (request->hnsw_index_config().distance_metric() == vector_db::CreateTableRequest_DistanceMetric_L2) {
         distance_metric = vector_db_engine::VectorIndex::DistanceMetric::L2;
     } else {
         distance_metric = vector_db_engine::VectorIndex::DistanceMetric::Cosine;

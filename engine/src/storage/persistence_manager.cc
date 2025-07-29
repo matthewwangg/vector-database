@@ -62,7 +62,7 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
         return;
     }
 
-    vector_db::IndexSnapshot index_snapshot;
+    vector_db::HNSWIndexSnapshot index_snapshot;
     index_snapshot.set_m(index->GetM());
     index_snapshot.set_m0(index->GetM0());
     index_snapshot.set_ef_construction(index->GetEfConstruction());
@@ -75,10 +75,10 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
     }
 
     if (index->GetMetric() == VectorIndex::DistanceMetric::L2) {
-        index_snapshot.set_distance_metric(vector_db::IndexSnapshot::L2);
+        index_snapshot.set_distance_metric(vector_db::L2);
     }
     if (index->GetMetric() == VectorIndex::DistanceMetric::Cosine) {
-        index_snapshot.set_distance_metric(vector_db::IndexSnapshot::COSINE);
+        index_snapshot.set_distance_metric(vector_db::COSINE);
     }
 
     for (const auto& [id, node] : index->GetNodes()) {
@@ -123,7 +123,7 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
 }
 
 std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
-    vector_db::IndexSnapshot index_snapshot;
+    vector_db::HNSWIndexSnapshot index_snapshot;
     std::ifstream in_index(index_snapshot_file_path_, std::ios::binary);
     if (!in_index) {
         return nullptr;
@@ -139,10 +139,10 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
     std::optional<Id> entry_point = index_snapshot.entry_point();
 
     VectorIndex::DistanceMetric distance_metric;
-    if (index_snapshot.distance_metric() == vector_db::IndexSnapshot::L2) {
+    if (index_snapshot.distance_metric() == vector_db::L2) {
         distance_metric = VectorIndex::DistanceMetric::L2;
     }
-    if (index_snapshot.distance_metric() == vector_db::IndexSnapshot::COSINE) {
+    if (index_snapshot.distance_metric() == vector_db::COSINE) {
         distance_metric = VectorIndex::DistanceMetric::Cosine;
     }
 
@@ -297,7 +297,7 @@ void VectorPersistenceManager::ReplayWAL(const std::function<void(const vector_d
             entry.mutable_create_config()->mutable_hnsw_index_config()->set_m0(m0);
             entry.mutable_create_config()->mutable_hnsw_index_config()->set_ef_construction(ef_construction);
             entry.mutable_create_config()->mutable_hnsw_index_config()->set_ml(ml);
-            entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric((distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 : vector_db::WALEntry::CreateConfig::HNSWIndexConfig::COSINE));
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric((distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::L2 : vector_db::WALEntry::CreateConfig::COSINE));
             entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
         }
         if (command == "drop") {
@@ -410,7 +410,7 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(i
             entry.mutable_create_config()->mutable_hnsw_index_config()->set_m0(m0);
             entry.mutable_create_config()->mutable_hnsw_index_config()->set_ef_construction(ef_construction);
             entry.mutable_create_config()->mutable_hnsw_index_config()->set_ml(ml);
-            entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric((distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::HNSWIndexConfig::L2 : vector_db::WALEntry::CreateConfig::HNSWIndexConfig::COSINE));
+            entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric((distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::L2 : vector_db::WALEntry::CreateConfig::COSINE));
             entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
         }
         if (command == "drop") {
