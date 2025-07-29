@@ -161,11 +161,11 @@ grpc::Status VectorDatabaseServiceImpl::CreateTable(grpc::ServerContext* context
         return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing arguments");
     }
 
-    vector_db_engine::HNSWIndex::DistanceMetric distance_metric;
-    if (request->hnsw_index_config().distance_metric() == vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2) {
-        distance_metric = vector_db_engine::HNSWIndex::DistanceMetric::L2;
+    vector_db_engine::VectorIndex::DistanceMetric distance_metric;
+    if (request->hnsw_index_config().distance_metric() == vector_db::CreateTableRequest_DistanceMetric_L2) {
+        distance_metric = vector_db_engine::VectorIndex::DistanceMetric::L2;
     } else {
-        distance_metric = vector_db_engine::HNSWIndex::DistanceMetric::Cosine;
+        distance_metric = vector_db_engine::VectorIndex::DistanceMetric::Cosine;
     }
 
     bool ok = engine_->CreateTable(name, vector_dimensionality, m, m0, ef_construction, ml, distance_metric, cache_size);

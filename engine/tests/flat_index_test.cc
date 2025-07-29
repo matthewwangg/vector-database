@@ -1,4 +1,4 @@
-#include "hnsw_index.h"
+#include "flat_index.h"
 
 #include <memory>
 
@@ -7,16 +7,16 @@
 
 namespace vector_db_engine {
 
-class HNSWIndexTest : public ::testing::Test {
+class FlatIndexTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        index_ = std::make_unique<HNSWIndex>(2, 4, 16, 1.0f, VectorIndex::DistanceMetric::L2, 4);
+        index_ = std::make_unique<FlatIndex>(VectorIndex::DistanceMetric::L2);
     }
 
-    std::unique_ptr<HNSWIndex> index_;
+    std::unique_ptr<FlatIndex> index_;
 };
 
-TEST_F(HNSWIndexTest, SuccessInsert) {
+TEST_F(FlatIndexTest, SuccessInsert) {
     index_->Insert(1, {0.5f, 0.4f, 0.6f, 0.2f});
 
     auto result = index_->Search({0.4f, 0.3f, 0.5f, 0.1f}, 1, 10);
@@ -24,7 +24,7 @@ TEST_F(HNSWIndexTest, SuccessInsert) {
     EXPECT_EQ(result[0], 1);
 }
 
-TEST_F(HNSWIndexTest, SuccessRemove) {
+TEST_F(FlatIndexTest, SuccessRemove) {
     index_->Insert(1, {0.5f, 0.4f, 0.6f, 0.2f});
     index_->Remove(1);
 
@@ -32,7 +32,7 @@ TEST_F(HNSWIndexTest, SuccessRemove) {
     EXPECT_EQ(result.size(), 0);
 }
 
-TEST_F(HNSWIndexTest, SuccessSearchL2) {
+TEST_F(FlatIndexTest, SuccessSearchL2) {
     index_->Insert(1, {0.5f, 0.4f, 0.6f, 0.2f});
     index_->Insert(2, {0.5f, 0.4f, 0.6f, 0.2f});
 
@@ -42,8 +42,8 @@ TEST_F(HNSWIndexTest, SuccessSearchL2) {
     EXPECT_THAT(result, ::testing::UnorderedElementsAre(1, 2));
 }
 
-TEST_F(HNSWIndexTest, SuccessSearchCosine) {
-    index_ = std::make_unique<HNSWIndex>(2, 4, 16, 1.0f, VectorIndex::DistanceMetric::Cosine, 4);
+TEST_F(FlatIndexTest, SuccessSearchCosine) {
+    index_ = std::make_unique<FlatIndex>(VectorIndex::DistanceMetric::Cosine);
 
     index_->Insert(1, {0.5f, 0.4f, 0.6f, 0.2f});
     index_->Insert(2, {0.5f, 0.4f, 0.6f, 0.2f});
@@ -55,3 +55,4 @@ TEST_F(HNSWIndexTest, SuccessSearchCosine) {
 }
 
 } // namespace vector_db_engine
+

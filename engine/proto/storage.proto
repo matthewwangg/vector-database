@@ -13,20 +13,20 @@ message VectorEntry {
   string content = 3;
 }
 
-message IndexSnapshot {
+enum DistanceMetric {
+  L2 = 0;
+  COSINE = 1;
+}
+
+message HNSWIndexSnapshot {
   uint64 m = 1;
   uint64 m0 = 2;
   uint64 ef_construction = 3;
   float ml = 4;
-
-  enum DistanceMetric {
-    L2 = 0;
-    COSINE = 1;
-  }
-
   DistanceMetric distance_metric = 5;
   int32 vector_dimensionality = 6;
   int64 max_level = 7;
+
   uint64 entry_point = 8;
   map<uint64, Node> nodes = 9;
   map<int64, IdSet> node_levels = 10;
@@ -41,4 +41,14 @@ message Node {
 
 message IdSet {
   repeated uint64 id = 1;
+}
+
+message FlatIndexSnapshot {
+  DistanceMetric distance_metric = 1;
+
+  map<uint64, Vector> vectors = 2;
+}
+
+message Vector {
+  repeated float vector = 1;
 }

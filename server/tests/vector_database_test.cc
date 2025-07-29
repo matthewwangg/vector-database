@@ -82,7 +82,7 @@ TEST_F(VectorDatabaseE2ETest, CreateTable) {
     hnsw_config->set_ef_construction(64);
     hnsw_config->set_ml(1.0f);
     hnsw_config->set_vector_dimensionality(384);
-    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2);
+    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_DistanceMetric_L2);
 
     grpc::Status status = stub_->CreateTable(&context, request, &response);
 
@@ -103,7 +103,7 @@ TEST_F(VectorDatabaseE2ETest, DropTable) {
     hnsw_config->set_ef_construction(64);
     hnsw_config->set_ml(1.0f);
     hnsw_config->set_vector_dimensionality(384);
-    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2);
+    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_DistanceMetric_L2);
 
     grpc::Status create_table_status = stub_->CreateTable(&create_table_context, create_table_request, &create_table_response);
 
@@ -134,7 +134,7 @@ TEST_F(VectorDatabaseE2ETest, ListTables) {
     hnsw_config->set_ef_construction(64);
     hnsw_config->set_ml(1.0f);
     hnsw_config->set_vector_dimensionality(384);
-    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2);
+    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_DistanceMetric_L2);
 
     grpc::Status create_table_status = stub_->CreateTable(&create_table_context, create_table_request, &create_table_response);
 
@@ -164,7 +164,7 @@ TEST_F(VectorDatabaseE2ETest, Insert) {
     hnsw_config->set_ef_construction(64);
     hnsw_config->set_ml(1.0f);
     hnsw_config->set_vector_dimensionality(384);
-    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2);
+    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_DistanceMetric_L2);
 
     grpc::Status create_table_status = stub_->CreateTable(&create_table_context, create_table_request, &create_table_response);
 
@@ -201,7 +201,7 @@ TEST_F(VectorDatabaseE2ETest, Remove) {
     hnsw_config->set_ef_construction(64);
     hnsw_config->set_ml(1.0f);
     hnsw_config->set_vector_dimensionality(384);
-    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2);
+    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_DistanceMetric_L2);
 
     grpc::Status create_table_status = stub_->CreateTable(&create_table_context, create_table_request, &create_table_response);
 
@@ -249,7 +249,7 @@ TEST_F(VectorDatabaseE2ETest, Search) {
     hnsw_config->set_ef_construction(64);
     hnsw_config->set_ml(1.0f);
     hnsw_config->set_vector_dimensionality(384);
-    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2);
+    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_DistanceMetric_L2);
 
     grpc::Status create_table_status = stub_->CreateTable(&create_table_context, create_table_request, &create_table_response);
 
@@ -303,7 +303,7 @@ TEST_F(VectorDatabaseE2ETest, Stats) {
     hnsw_config->set_ef_construction(64);
     hnsw_config->set_ml(1.0f);
     hnsw_config->set_vector_dimensionality(384);
-    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2);
+    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_DistanceMetric_L2);
 
     grpc::Status create_table_status = stub_->CreateTable(&create_table_context, create_table_request, &create_table_response);
 
@@ -369,7 +369,7 @@ TEST_F(VectorDatabaseE2ETest, Metrics) {
     hnsw_config->set_ef_construction(64);
     hnsw_config->set_ml(1.0f);
     hnsw_config->set_vector_dimensionality(384);
-    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_HNSWIndexConfig_DistanceMetric_L2);
+    hnsw_config->set_distance_metric(vector_db::CreateTableRequest_DistanceMetric_L2);
 
     grpc::Status create_table_status = stub_->CreateTable(&create_table_context, create_table_request, &create_table_response);
 

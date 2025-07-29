@@ -29,7 +29,7 @@ public:
 
     void AppendInsert(Id id, const Vector& vector, const std::string& content);
     void AppendRemove(Id id);
-    void AppendCreate(int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::HNSWIndex::DistanceMetric distance_metric, std::size_t cache_size);
+    void AppendCreate(int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::VectorIndex::DistanceMetric distance_metric, std::size_t cache_size);
     void AppendDrop();
 
     void ReplayWAL(const std::function<void(const vector_db::WALEntry&)>& callback);

@@ -1,0 +1,90 @@
+#include "flat_index.h"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <queue>
+#include <vector>
+
+namespace vector_db_engine {
+
+FlatIndex::FlatIndex(DistanceMetric metric)
+    : metric_(metric)
+{}
+
+void FlatIndex::Insert(Id id, const Vector& vector) {
+    vectors_.insert({id, vector});
+}
+
+void FlatIndex::Remove(Id id) {
+    vectors_.erase(id);
+}
+
+std::vector<Id> FlatIndex::Search(const Vector& query, std::size_t k, std::size_t search_param) const {
+    std::priority_queue<std::pair<float, Id>> top_k;
+    for (const auto& [id, vector] : vectors_) {
+        float distance = ComputeDistance(query, vector);
+        top_k.emplace(distance, id);
+
+        auto [kth_distance, kth_vector] = top_k.top();
+        if (top_k.size() > k) {
+            top_k.pop();
+        }
+    }
+
+    std::vector<Id> nearest;
+    while (!top_k.empty()) {
+        nearest.push_back(top_k.top().second);
+        top_k.pop();
+    }
+    std::reverse(nearest.begin(), nearest.end());
+
+    return nearest;
+}
+
+void FlatIndex::Cleanup() {
+    return;
+}
+
+void FlatIndex::Reindex() {
+    return;
+}
+
+float FlatIndex::ComputeDistance(const Vector& a, const Vector& b) const {
+    if (a.size() != b.size()) {
+        return std::numeric_limits<float>::infinity();
+    }
+
+    if (metric_ == DistanceMetric::L2) {
+        float distance = 0.0f;
+
+        for (size_t i = 0; i < a.size(); ++i) {
+            float diff = a[i] - b[i];
+            distance += diff * diff;
+        }
+        return std::sqrt(distance);
+    }
+
+    if (metric_ == DistanceMetric::Cosine) {
+        float dot_product = 0.0f;
+        float a_norm = 0.0f;
+        float b_norm = 0.0f;
+
+        for (size_t i = 0; i < a.size(); ++i) {
+            dot_product += a[i] * b[i];
+            a_norm += a[i] * a[i];
+            b_norm += b[i] * b[i];
+        }
+
+        float denominator = std::sqrt(a_norm) * std::sqrt(b_norm);
+        if (denominator == 0) {
+            return 1.0f;
+        }
+
+        return 1.0f - dot_product / denominator;
+    }
+
+    return std::numeric_limits<float>::infinity();
+}
+
+} // namespace vector_db_engine
