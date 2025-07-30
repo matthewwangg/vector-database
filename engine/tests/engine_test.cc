@@ -60,13 +60,13 @@ MATCHER_P3(MatchData, expected_id, expected_vector, expected_content, "") {
 TEST_F(EngineTest, CreateTableWithHNSWIndex) {
     std::string table = "test_table";
     HNSWIndex::HNSWIndexConfig hnsw_index_config = {16, 32, 64, 1.0f, vector_db_engine::VectorIndex::DistanceMetric::L2, 384};
-    FlatIndex::FlatIndexConfig flat_index_config;
+    FlatIndex::FlatIndexConfig flat_index_config = {};
     EXPECT_TRUE(engine_->CreateTable(table, 384, hnsw_index_config, flat_index_config, 32));
 }
 
 TEST_F(EngineTest, CreateTableWithFlatIndex) {
     std::string table = "test_table";
-    HNSWIndex::HNSWIndexConfig hnsw_index_config;
+    HNSWIndex::HNSWIndexConfig hnsw_index_config = {};
     FlatIndex::FlatIndexConfig flat_index_config = {384, vector_db_engine::VectorIndex::DistanceMetric::L2};
     EXPECT_TRUE(engine_->CreateTable(table, 384, hnsw_index_config, flat_index_config, 32));
 }
@@ -74,7 +74,7 @@ TEST_F(EngineTest, CreateTableWithFlatIndex) {
 TEST_F(EngineTest, DropTable) {
     std::string table = "test_table";
     HNSWIndex::HNSWIndexConfig hnsw_index_config = {16, 32, 64, 1.0f, vector_db_engine::VectorIndex::DistanceMetric::L2, 384};
-    FlatIndex::FlatIndexConfig flat_index_config;
+    FlatIndex::FlatIndexConfig flat_index_config = {};
     ASSERT_TRUE(engine_->CreateTable(table, 384, hnsw_index_config, flat_index_config, 32));
 
     EXPECT_TRUE(engine_->DropTable(table));
@@ -83,7 +83,7 @@ TEST_F(EngineTest, DropTable) {
 TEST_F(EngineTest, ListTables) {
     std::string table = "test_table";
     HNSWIndex::HNSWIndexConfig hnsw_index_config = {16, 32, 64, 1.0f, vector_db_engine::VectorIndex::DistanceMetric::L2, 384};
-    FlatIndex::FlatIndexConfig flat_index_config;
+    FlatIndex::FlatIndexConfig flat_index_config = {};
     ASSERT_TRUE(engine_->CreateTable(table, 384, hnsw_index_config, flat_index_config, 32));
 
     auto tables = engine_->ListTables();
@@ -94,7 +94,7 @@ TEST_F(EngineTest, ListTables) {
 TEST_F(EngineTest, Insert) {
     std::string table = "test_table";
     HNSWIndex::HNSWIndexConfig hnsw_index_config = {16, 32, 64, 1.0f, vector_db_engine::VectorIndex::DistanceMetric::L2, 384};
-    FlatIndex::FlatIndexConfig flat_index_config;
+    FlatIndex::FlatIndexConfig flat_index_config = {};
     ASSERT_TRUE(engine_->CreateTable(table, 384, hnsw_index_config, flat_index_config, 32));
 
     EXPECT_TRUE(engine_->Insert(table, 1, MakeVector(), "test_1"));
@@ -103,7 +103,7 @@ TEST_F(EngineTest, Insert) {
 TEST_F(EngineTest, Remove) {
     std::string table = "test_table";
     HNSWIndex::HNSWIndexConfig hnsw_index_config = {16, 32, 64, 1.0f, vector_db_engine::VectorIndex::DistanceMetric::L2, 384};
-    FlatIndex::FlatIndexConfig flat_index_config;
+    FlatIndex::FlatIndexConfig flat_index_config = {};
     ASSERT_TRUE(engine_->CreateTable(table, 384, hnsw_index_config, flat_index_config, 32));
 
     std::vector<float> vector = MakeVector();
@@ -115,7 +115,7 @@ TEST_F(EngineTest, Remove) {
 TEST_F(EngineTest, SearchWithHNSWIndex) {
     std::string table = "test_table";
     HNSWIndex::HNSWIndexConfig hnsw_index_config = {16, 32, 64, 1.0f, vector_db_engine::VectorIndex::DistanceMetric::L2, 384};
-    FlatIndex::FlatIndexConfig flat_index_config;
+    FlatIndex::FlatIndexConfig flat_index_config = {};
     ASSERT_TRUE(engine_->CreateTable(table, 384, hnsw_index_config, flat_index_config, 32));
 
     std::vector<float> vector = MakeVector();
@@ -130,7 +130,7 @@ TEST_F(EngineTest, SearchWithHNSWIndex) {
 
 TEST_F(EngineTest, SearchWithFlatIndex) {
     std::string table = "test_table";
-    HNSWIndex::HNSWIndexConfig hnsw_index_config;
+    HNSWIndex::HNSWIndexConfig hnsw_index_config = {};
     FlatIndex::FlatIndexConfig flat_index_config = {384, vector_db_engine::VectorIndex::DistanceMetric::L2};
     ASSERT_TRUE(engine_->CreateTable(table, 384, hnsw_index_config, flat_index_config, 32));
 

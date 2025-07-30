@@ -79,6 +79,8 @@ TEST_F(PersistenceManagerTest, SaveAndLoadSnapshotWithFlatIndex) {
 
     store = persistence_manager->LoadSnapshot();
 
+    persistence_manager->Clear();
+
     auto results = store->Search({0.5f, 0.4f, 0.6f, 0.2f}, 2, 10);
     EXPECT_THAT(results, ::testing::UnorderedElementsAre(MatchData(1, std::vector<float>{0.5f, 0.4f, 0.6f, 0.2f}, "test_content_1"), MatchData(2, std::vector<float>{0.5f, 0.4f, 0.6f, 0.2f}, "test_content_2")));
 }

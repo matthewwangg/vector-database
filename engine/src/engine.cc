@@ -340,7 +340,8 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, const HNSW
     }
 
     auto vector_store = std::make_unique<VectorStore>(index_type, std::move(index), vector_dimensionality);
-    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, logger_.get());    auto metrics_manager = std::make_unique<MetricsManager>();
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
+    auto metrics_manager = std::make_unique<MetricsManager>();
     auto stats_manager = std::make_unique<StatsManager>();
     auto lru_cache = std::make_unique<LRUCache>(cache_size);
 
@@ -378,6 +379,7 @@ bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, c
         index_type = VectorStore::IndexType::FLAT;
         stored_index_type = VectorPersistenceManager::StoredIndexType::FLAT;
     }
+
     auto vector_store = std::make_unique<VectorStore>(index_type, std::move(index), vector_dimensionality);
     auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
     auto metrics_manager = std::make_unique<MetricsManager>();

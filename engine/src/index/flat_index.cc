@@ -1,9 +1,12 @@
 #include "flat_index.h"
+#include <iostream>
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <mutex>
 #include <queue>
+#include <shared_mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -19,6 +22,8 @@ FlatIndex::FlatIndex(const FlatIndexConfig& config, std::unordered_map<Id, Vecto
 {}
 
 void FlatIndex::Insert(Id id, const Vector& vector) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+
     if (vector.size() != config_.vector_dimensionality) {
         return;
     }
@@ -26,10 +31,14 @@ void FlatIndex::Insert(Id id, const Vector& vector) {
 }
 
 void FlatIndex::Remove(Id id) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+
     vectors_.erase(id);
 }
 
 std::vector<Id> FlatIndex::Search(const Vector& query, std::size_t k, std::size_t search_param) const {
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+
     if (query.size() != config_.vector_dimensionality) {
         return {};
     }

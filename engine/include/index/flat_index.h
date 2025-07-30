@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <shared_mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -36,6 +37,8 @@ private:
     std::unordered_map<Id, Vector> vectors_;
 
     FlatIndexConfig config_;
+
+    mutable std::shared_mutex rw_mutex_;
 };
 
 } // namespace vector_db_engine
