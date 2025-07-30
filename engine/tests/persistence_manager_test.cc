@@ -46,7 +46,7 @@ MATCHER_P3(MatchData, expected_id, expected_vector, expected_content, "") {
     return true;
 }
 
-TEST_F(PersistenceManagerTest, SaveAndLoadSnapshot) {
+TEST_F(PersistenceManagerTest, SaveAndLoadSnapshotWithHNSWIndex) {
     HNSWIndex::HNSWIndexConfig config = {2, 4, 16, 1.0f, VectorIndex::DistanceMetric::L2, 4};
     auto index = std::make_unique<HNSWIndex>(config);
     store_ = std::make_unique<VectorStore>(VectorStore::IndexType::HNSW, std::move(index), 4);
@@ -61,6 +61,25 @@ TEST_F(PersistenceManagerTest, SaveAndLoadSnapshot) {
     store_ = persistence_manager_->LoadSnapshot();
 
     auto results = store_->Search({0.5f, 0.4f, 0.6f, 0.2f}, 2, 10);
+    EXPECT_THAT(results, ::testing::UnorderedElementsAre(MatchData(1, std::vector<float>{0.5f, 0.4f, 0.6f, 0.2f}, "test_content_1"), MatchData(2, std::vector<float>{0.5f, 0.4f, 0.6f, 0.2f}, "test_content_2")));
+}
+
+TEST_F(PersistenceManagerTest, SaveAndLoadSnapshotWithFlatIndex) {
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>("unit_test_flat", VectorPersistenceManager::StoredIndexType::FLAT, "unit_test_store_snapshot.dat", "unit_test_index_snapshot.dat", "unit_test_wal.log", logger_.get());
+    FlatIndex::FlatIndexConfig config = {4, VectorIndex::DistanceMetric::L2};
+    auto index = std::make_unique<FlatIndex>(config);
+    auto store = std::make_unique<VectorStore>(VectorStore::IndexType::FLAT, std::move(index), 4);
+    store->Insert(1, {0.5f, 0.4f, 0.6f, 0.2f}, "test_content_1");
+    store->Insert(2, {0.5f, 0.4f, 0.6f, 0.2f}, "test_content_2");
+
+    persistence_manager->SaveSnapshot(*store);
+
+    index = std::make_unique<FlatIndex>(config);
+    store = std::make_unique<VectorStore>(VectorStore::IndexType::FLAT, std::move(index), 4);
+
+    store = persistence_manager->LoadSnapshot();
+
+    auto results = store->Search({0.5f, 0.4f, 0.6f, 0.2f}, 2, 10);
     EXPECT_THAT(results, ::testing::UnorderedElementsAre(MatchData(1, std::vector<float>{0.5f, 0.4f, 0.6f, 0.2f}, "test_content_1"), MatchData(2, std::vector<float>{0.5f, 0.4f, 0.6f, 0.2f}, "test_content_2")));
 }
 

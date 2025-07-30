@@ -45,8 +45,9 @@ message IdSet {
 
 message FlatIndexSnapshot {
   DistanceMetric distance_metric = 1;
+  int32 vector_dimensionality = 2;
 
-  map<uint64, Vector> vectors = 2;
+  map<uint64, Vector> vectors = 3;
 }
 
 message Vector {

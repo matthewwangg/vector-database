@@ -58,6 +58,7 @@ message WALEntry {
 
     message FlatIndexConfig {
       DistanceMetric distance_metric = 1;
+      int32 vector_dimensionality = 2;
     }
 
     oneof index_config {
@@ -97,6 +98,11 @@ message CreateRequest {
 
   StoreConfig store_config = 2;
 
+  enum DistanceMetric {
+    L2 = 0;
+    COSINE = 1;
+  }
+
   message HNSWIndexConfig {
     uint64 m = 1;
     uint64 m0 = 2;
@@ -104,23 +110,24 @@ message CreateRequest {
     float ml = 4;
     int32 vector_dimensionality = 5;
 
-    enum DistanceMetric {
-      L2 = 0;
-      COSINE = 1;
-    }
-
     DistanceMetric distance_metric = 6;
+  }
+
+  message FlatIndexConfig {
+    DistanceMetric distance_metric = 1;
+    int32 vector_dimensionality = 2;
   }
 
   oneof index_config {
     HNSWIndexConfig hnsw_index_config = 3;
+    FlatIndexConfig flat_index_config = 4;
   }
 
   message CacheConfig {
     uint64 cache_size = 1;
   }
 
-  CacheConfig cache_config = 4;
+  CacheConfig cache_config = 5;
 }
 
 message CreateResponse {}

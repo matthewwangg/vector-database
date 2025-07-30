@@ -4,12 +4,18 @@
 #include <cmath>
 #include <limits>
 #include <queue>
+#include <unordered_map>
 #include <vector>
 
 namespace vector_db_engine {
 
 FlatIndex::FlatIndex(const FlatIndexConfig& config)
     : config_(config)
+{}
+
+FlatIndex::FlatIndex(const FlatIndexConfig& config, std::unordered_map<Id, Vector> vectors)
+    : config_(config),
+      vectors_(vectors)
 {}
 
 void FlatIndex::Insert(Id id, const Vector& vector) {

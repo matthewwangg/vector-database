@@ -18,6 +18,7 @@ public:
     };
 
     explicit FlatIndex(const FlatIndexConfig& config);
+    explicit FlatIndex(const FlatIndexConfig& config, std::unordered_map<Id, Vector> vectors);
 
     void Insert(Id id, const Vector& vector) override;
     void Remove(Id id) override;
@@ -27,6 +28,7 @@ public:
     void Reindex() override;
 
     FlatIndexConfig GetConfig() const { return config_; }
+    std::unordered_map<Id, Vector> GetVectors() const { return vectors_; }
 
 private:
     float ComputeDistance(const Vector& a, const Vector& b) const;

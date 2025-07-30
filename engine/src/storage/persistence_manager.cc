@@ -38,28 +38,30 @@ VectorPersistenceManager::VectorPersistenceManager(std::string name, StoredIndex
 }
 
 void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
+    vector_db::StoreSnapshot store_snapshot;
+    store_snapshot.set_vector_dimensionality(store.GetVectorDimensionality());
+    std::string index_type_string;
+
+    for (auto &[id, data]: store.GetStore()) {
+        auto *vector_entry = store_snapshot.add_vector_entry();
+        vector_entry->set_id(id);
+        vector_entry->set_content(data.content);
+
+        for (float value: data.vector) {
+            vector_entry->add_vector(value);
+        }
+    }
+
+    std::ofstream out_store(store_snapshot_file_path_, std::ios::binary);
+    if (!out_store) {
+        logger_->Error("failed to open store file", name_);
+        return;
+    }
+    store_snapshot.SerializeToOstream(&out_store);
+
     if (stored_index_type_ == StoredIndexType::HNSW) {
-        vector_db::StoreSnapshot store_snapshot;
-        store_snapshot.set_vector_dimensionality(store.GetVectorDimensionality());
-
-        for (auto &[id, data]: store.GetStore()) {
-            auto *vector_entry = store_snapshot.add_vector_entry();
-            vector_entry->set_id(id);
-            vector_entry->set_content(data.content);
-
-            for (float value: data.vector) {
-                vector_entry->add_vector(value);
-            }
-        }
-
-        std::ofstream out_store(store_snapshot_file_path_, std::ios::binary);
-        if (!out_store) {
-            logger_->Error("failed to open store file", name_);
-            return;
-        }
-        store_snapshot.SerializeToOstream(&out_store);
-
-        const auto *index = dynamic_cast<const HNSWIndex *>(store.GetIndex());
+        index_type_string = "HNSW";
+        const auto* index = dynamic_cast<const HNSWIndex*>(store.GetIndex());
         if (!index) {
             logger_->Error("failed to get index, skipping index save", name_);
             return;
@@ -117,19 +119,55 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
             return;
         }
         index_snapshot.SerializeToOstream(&out_index);
-
-        if (!std::filesystem::exists(store_snapshot_file_path_) ||
-            std::filesystem::file_size(store_snapshot_file_path_) == 0) {
+    } else {
+        index_type_string = "flat";
+        const auto* index = dynamic_cast<const FlatIndex*>(store.GetIndex());
+        if (!index) {
+            logger_->Error("failed to get index, skipping index save", name_);
             return;
         }
 
-        logger_->Info(table_name_ + " snapshot saved successfully", name_);
+        vector_db::FlatIndexSnapshot index_snapshot;
+        index_snapshot.set_vector_dimensionality(index->GetConfig().vector_dimensionality);
+        if (index->GetConfig().metric == VectorIndex::DistanceMetric::L2) {
+            index_snapshot.set_distance_metric(vector_db::L2);
+        }
+        if (index->GetConfig().metric == VectorIndex::DistanceMetric::Cosine) {
+            index_snapshot.set_distance_metric(vector_db::COSINE);
+        }
+
+        for (const auto& [id, vector] : index->GetVectors()) {
+            auto& vector_entry = (*index_snapshot.mutable_vectors())[id];
+            for (float value : vector) {
+                vector_entry.add_vector(value);
+            }
+        }
+
+        std::ofstream out_index(index_snapshot_file_path_, std::ios::binary);
+        if (!out_index) {
+            logger_->Error("failed to open index file", name_);
+            return;
+        }
+        index_snapshot.SerializeToOstream(&out_index);
     }
-    // add else
+
+    if (!std::filesystem::exists(index_snapshot_file_path_) ||
+        std::filesystem::file_size(index_snapshot_file_path_) == 0) {
+        return;
+    }
+
+    logger_->Info(table_name_ + " snapshot saved successfully with " + index_type_string + " index", name_);
 }
 
 std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
+    VectorStore::IndexType index_type;
+    std::unique_ptr<VectorIndex> reconstructed_index;
+    std::string index_type_string;
+
     if (stored_index_type_ == StoredIndexType::HNSW) {
+        index_type_string = "HNSW";
+        index_type = VectorStore::IndexType::HNSW;
+
         vector_db::HNSWIndexSnapshot index_snapshot;
         std::ifstream in_index(index_snapshot_file_path_, std::ios::binary);
         if (!in_index) {
@@ -175,42 +213,65 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
         }
 
         HNSWIndex::HNSWIndexConfig config = {m, m0, ef_construction, ml, distance_metric, vector_dimensionality};
-        std::unique_ptr<HNSWIndex> reconstructed_index = std::make_unique<HNSWIndex>(config, max_level, entry_point,
-                                                                                     reconstructed_nodes,
+        reconstructed_index = std::make_unique<HNSWIndex>(config, max_level, entry_point, reconstructed_nodes,
                                                                                      reconstructed_node_levels);
+    } else {
+        index_type_string = "flat";
+        index_type = VectorStore::IndexType::FLAT;
 
-        vector_db::StoreSnapshot store_snapshot;
-        std::ifstream in_store(store_snapshot_file_path_, std::ios::binary);
-        if (!in_store) {
+        vector_db::FlatIndexSnapshot index_snapshot;
+        std::ifstream in_index(index_snapshot_file_path_, std::ios::binary);
+        if (!in_index) {
             return nullptr;
         }
-        store_snapshot.ParseFromIstream(&in_store);
+        index_snapshot.ParseFromIstream(&in_index);
 
-        std::unordered_map<Id, VectorStore::Data> reconstructed_store;
-        for (const auto &vector_entry: store_snapshot.vector_entry()) {
-            Vector vector(vector_entry.vector().begin(), vector_entry.vector().end());
-            Id id = vector_entry.id();
-            reconstructed_store[id] = {id, vector, vector_entry.content()};
+        int vector_dimensionality = index_snapshot.vector_dimensionality();
+
+        VectorIndex::DistanceMetric distance_metric;
+        if (index_snapshot.distance_metric() == vector_db::L2) {
+            distance_metric = VectorIndex::DistanceMetric::L2;
+        }
+        if (index_snapshot.distance_metric() == vector_db::COSINE) {
+            distance_metric = VectorIndex::DistanceMetric::Cosine;
         }
 
-        std::unique_ptr<VectorStore> loaded_store = std::make_unique<VectorStore>(VectorStore::IndexType::HNSW,
-                                                                                  std::move(reconstructed_index),
-                                                                                  store_snapshot.vector_dimensionality(),
-                                                                                  reconstructed_store);
-
-        if (loaded_store->GetStore().size() == 0) {
-            return nullptr;
+        std::unordered_map<Id, Vector> vectors;
+        for (const auto& [id, vector_proto] : index_snapshot.vectors()) {
+            Vector vector(vector_proto.vector().begin(), vector_proto.vector().end());
+            vectors[id] = std::move(vector);
         }
 
-        logger_->Info(table_name_ + " snapshot loaded successfully with " +
-                      std::to_string(store_snapshot.vector_entry_size()) + " vectors, " +
-                      std::to_string(index_snapshot.nodes_size()) + " index nodes, and dimensionality of " +
-                      std::to_string(store_snapshot.vector_dimensionality()), name_);
-
-        return std::move(loaded_store);
+        FlatIndex::FlatIndexConfig config = {vector_dimensionality, distance_metric};
+        reconstructed_index = std::make_unique<FlatIndex>(config, vectors);
     }
-    // add else
-    return nullptr;
+    vector_db::StoreSnapshot store_snapshot;
+    std::ifstream in_store(store_snapshot_file_path_, std::ios::binary);
+    if (!in_store) {
+        return nullptr;
+    }
+    store_snapshot.ParseFromIstream(&in_store);
+
+    std::unordered_map<Id, VectorStore::Data> reconstructed_store;
+    for (const auto &vector_entry: store_snapshot.vector_entry()) {
+        Vector vector(vector_entry.vector().begin(), vector_entry.vector().end());
+        Id id = vector_entry.id();
+        reconstructed_store[id] = {id, vector, vector_entry.content()};
+    }
+
+    std::unique_ptr<VectorStore> loaded_store = std::make_unique<VectorStore>(index_type,
+                                                                              std::move(reconstructed_index),
+                                                                              store_snapshot.vector_dimensionality(),
+                                                                              reconstructed_store);
+    if (loaded_store->GetStore().size() == 0) {
+        return nullptr;
+    }
+
+    logger_->Info(table_name_ + " snapshot loaded successfully with " + index_type_string + " index, " +
+                  std::to_string(store_snapshot.vector_entry_size()) + " vectors, and dimensionality of " +
+                  std::to_string(store_snapshot.vector_dimensionality()), name_);
+
+    return std::move(loaded_store);
 }
 
 void VectorPersistenceManager::AppendInsert(Id id, const Vector& vector, const std::string& content) {
@@ -326,8 +387,17 @@ void VectorPersistenceManager::ReplayWAL(const std::function<void(const vector_d
                         (distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::L2
                                                         : vector_db::WALEntry::CreateConfig::COSINE));
                 entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
+            } else {
+                stream >> vector_dimensionality;
+                stream >> distance_metric_string;
+                stream >> cache_size;
+
+                entry.mutable_create_config()->mutable_store_config()->set_vector_dimensionality(vector_dimensionality);
+                entry.mutable_create_config()->mutable_flat_index_config()->set_distance_metric(
+                        (distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::L2
+                                                        : vector_db::WALEntry::CreateConfig::COSINE));
+                entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
             }
-            // add else
         }
         if (command == "drop") {
             entry.set_type(vector_db::WALEntry::DROP);
@@ -416,31 +486,44 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(i
             entry.mutable_remove_config()->set_id(id);
         }
         if (command == "create")  {
-            entry.set_type(vector_db::WALEntry::CREATE);
-
             int vector_dimensionality;
-            std::size_t m;
-            std::size_t m0;
-            std::size_t ef_construction;
-            float ml;
             std::string distance_metric_string;
             std::size_t cache_size;
 
-            stream >> vector_dimensionality;
-            stream >> m;
-            stream >> m0;
-            stream >> ef_construction;
-            stream >> ml;
-            stream >> distance_metric_string;
-            stream >> cache_size;
+            if (stored_index_type_ == StoredIndexType::HNSW) {
+                std::size_t m;
+                std::size_t m0;
+                std::size_t ef_construction;
+                float ml;
 
-            entry.mutable_create_config()->mutable_store_config()->set_vector_dimensionality(vector_dimensionality);
-            entry.mutable_create_config()->mutable_hnsw_index_config()->set_m(m);
-            entry.mutable_create_config()->mutable_hnsw_index_config()->set_m0(m0);
-            entry.mutable_create_config()->mutable_hnsw_index_config()->set_ef_construction(ef_construction);
-            entry.mutable_create_config()->mutable_hnsw_index_config()->set_ml(ml);
-            entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric((distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::L2 : vector_db::WALEntry::CreateConfig::COSINE));
-            entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
+                stream >> vector_dimensionality;
+                stream >> m;
+                stream >> m0;
+                stream >> ef_construction;
+                stream >> ml;
+                stream >> distance_metric_string;
+                stream >> cache_size;
+
+                entry.mutable_create_config()->mutable_store_config()->set_vector_dimensionality(vector_dimensionality);
+                entry.mutable_create_config()->mutable_hnsw_index_config()->set_m(m);
+                entry.mutable_create_config()->mutable_hnsw_index_config()->set_m0(m0);
+                entry.mutable_create_config()->mutable_hnsw_index_config()->set_ef_construction(ef_construction);
+                entry.mutable_create_config()->mutable_hnsw_index_config()->set_ml(ml);
+                entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric(
+                        (distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::L2
+                                                        : vector_db::WALEntry::CreateConfig::COSINE));
+                entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
+            } else {
+                stream >> vector_dimensionality;
+                stream >> distance_metric_string;
+                stream >> cache_size;
+
+                entry.mutable_create_config()->mutable_store_config()->set_vector_dimensionality(vector_dimensionality);
+                entry.mutable_create_config()->mutable_flat_index_config()->set_distance_metric(
+                        (distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::L2
+                                                        : vector_db::WALEntry::CreateConfig::COSINE));
+                entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
+            }
         }
         if (command == "drop") {
             entry.set_type(vector_db::WALEntry::DROP);

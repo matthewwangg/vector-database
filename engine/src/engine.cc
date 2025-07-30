@@ -88,7 +88,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
 
     for (const std::string& table : table_names) {
         HNSWIndex::HNSWIndexConfig hnsw_index_config = {16, 32, 64, 1.0f, vector_db_engine::VectorIndex::DistanceMetric::L2, 384};
-        FlatIndex::FlatIndexConfig flat_index_config;
+        FlatIndex::FlatIndexConfig flat_index_config; // fix
         bool ok = CreateTable(table, 384, hnsw_index_config, flat_index_config, 32);
         if (!ok) {
             continue;
@@ -477,13 +477,13 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
     if (entry.type() == vector_db::WALEntry::CREATE) {
         const auto& config = entry.create_config();
         const auto& store_config = config.store_config();
-        const auto& index_config = config.hnsw_index_config();
+        const auto& index_config = config.hnsw_index_config(); // FIX
         const auto& cache_config = config.cache_config();
 
         bool ok = false;
         std::unique_lock replica_lock(replica_mutex_);
         HNSWIndex::HNSWIndexConfig hnsw_index_config = {index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine), store_config.vector_dimensionality()};
-        FlatIndex::FlatIndexConfig flat_index_config;
+        FlatIndex::FlatIndexConfig flat_index_config; // fix
         if (metadata_.primary) {
             ok = CreateTable(entry.table(), store_config.vector_dimensionality(), hnsw_index_config, flat_index_config, cache_config.cache_size());
         } else {
