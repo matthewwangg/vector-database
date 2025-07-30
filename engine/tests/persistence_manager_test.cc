@@ -20,7 +20,7 @@ protected:
         persistence_manager_ = std::make_unique<VectorPersistenceManager>("unit_test", "unit_test_store_snapshot.dat", "unit_test_index_snapshot.dat", "unit_test_wal.log", logger_.get());
 
         auto index = std::make_unique<HNSWIndex>(2, 4, 16, 1.0f, VectorIndex::DistanceMetric::L2, 4);
-        store_ = std::make_unique<VectorStore>(std::move(index), 4);
+        store_ = std::make_unique<VectorStore>(VectorStore::IndexType::HNSW, std::move(index), 4);
     }
 
     void TearDown() override {
@@ -47,14 +47,14 @@ MATCHER_P3(MatchData, expected_id, expected_vector, expected_content, "") {
 
 TEST_F(PersistenceManagerTest, SaveAndLoadSnapshot) {
     auto index = std::make_unique<HNSWIndex>(2, 4, 16, 1.0f, VectorIndex::DistanceMetric::L2, 4);
-    store_ = std::make_unique<VectorStore>(std::move(index), 4);
+    store_ = std::make_unique<VectorStore>(VectorStore::IndexType::HNSW, std::move(index), 4);
     store_->Insert(1, {0.5f, 0.4f, 0.6f, 0.2f}, "test_content_1");
     store_->Insert(2, {0.5f, 0.4f, 0.6f, 0.2f}, "test_content_2");
 
     persistence_manager_->SaveSnapshot(*store_);
 
     index = std::make_unique<HNSWIndex>(2, 4, 16, 1.0f, VectorIndex::DistanceMetric::L2, 4);
-    store_ = std::make_unique<VectorStore>(std::move(index), 4);
+    store_ = std::make_unique<VectorStore>(VectorStore::IndexType::HNSW, std::move(index), 4);
 
     store_ = persistence_manager_->LoadSnapshot();
 

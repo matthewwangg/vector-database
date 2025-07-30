@@ -324,7 +324,7 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, std::size_
     }
 
     auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality);
-    auto vector_store = std::make_unique<VectorStore>(std::move(hnsw_index), vector_dimensionality);
+    auto vector_store = std::make_unique<VectorStore>(VectorStore::IndexType::HNSW, std::move(hnsw_index), vector_dimensionality);
     auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
     auto metrics_manager = std::make_unique<MetricsManager>();
     auto stats_manager = std::make_unique<StatsManager>();
@@ -353,7 +353,7 @@ bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, s
     std::string write_ahead_log = name + "_" + kWriteAheadLogFilename;
 
     auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality);
-    auto vector_store = std::make_unique<VectorStore>(std::move(hnsw_index), vector_dimensionality);
+    auto vector_store = std::make_unique<VectorStore>(VectorStore::IndexType::HNSW, std::move(hnsw_index), vector_dimensionality);
     auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
     auto metrics_manager = std::make_unique<MetricsManager>();
     auto stats_manager = std::make_unique<StatsManager>();

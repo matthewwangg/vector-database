@@ -13,7 +13,7 @@ class VectorStoreTest : public ::testing::Test {
 protected:
     void SetUp() override {
         auto index = std::make_unique<HNSWIndex>(2, 4, 16, 1.0f, VectorIndex::DistanceMetric::L2, 4);
-        store_ = std::make_unique<VectorStore>(std::move(index), 4);
+        store_ = std::make_unique<VectorStore>(VectorStore::IndexType::HNSW, std::move(index), 4);
     }
 
     std::unique_ptr<VectorStore> store_;

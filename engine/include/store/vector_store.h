@@ -23,8 +23,13 @@ public:
         std::string content;
     };
 
-    explicit VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality);
-    explicit VectorStore(std::unique_ptr<VectorIndex> index, int vector_dimensionality, std::unordered_map<Id, Data> data);
+    enum class IndexType {
+        HNSW = 0,
+        FLAT = 1,
+    };
+
+    explicit VectorStore(IndexType index_type, std::unique_ptr<VectorIndex> index, int vector_dimensionality);
+    explicit VectorStore(IndexType index_type, std::unique_ptr<VectorIndex> index, int vector_dimensionality, std::unordered_map<Id, Data> data);
 
     bool Insert(Id id, const Vector& vector, const std::string& content);
     bool Remove(Id id);
@@ -34,9 +39,12 @@ public:
 
     const std::unordered_map<Id, Data>& GetStore() const { return store_; }
     const VectorIndex* GetIndex() const { return index_.get(); }
+    IndexType GetIndexType() const { return index_type_; }
     int GetVectorDimensionality() const { return vector_dimensionality_; }
 
 private:
+    IndexType index_type_;
+
     std::unordered_map<Id, Data> store_;
     std::unique_ptr<VectorIndex> index_;
 
