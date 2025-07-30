@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "cleaner.h"
+#include "flat_index.h"
 #include "hnsw_index.h"
 #include "local_logger.h"
 #include "logger.h"
@@ -86,7 +87,9 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     logger_.get());
 
     for (const std::string& table : table_names) {
-        bool ok = CreateTable(table, 384, 16, 32, 64, 1.0f, vector_db_engine::VectorIndex::DistanceMetric::L2, 32);
+        HNSWIndex::HNSWIndexConfig hnsw_index_config = {16, 32, 64, 1.0f, vector_db_engine::VectorIndex::DistanceMetric::L2, 384};
+        FlatIndex::FlatIndexConfig flat_index_config;
+        bool ok = CreateTable(table, 384, hnsw_index_config, flat_index_config, 32);
         if (!ok) {
             continue;
         }
@@ -304,7 +307,7 @@ MetricsManager::Metrics Engine::GetMetrics(std::string table_name) {
     return metrics_manager_map_[table_name]->GetMetrics();
 }
 
-bool Engine::CreateTable(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::VectorIndex::DistanceMetric distance_metric, std::size_t cache_size) {
+bool Engine::CreateTable(std::string name, int vector_dimensionality, const HNSWIndex::HNSWIndexConfig& hnsw_index_config, const FlatIndex::FlatIndexConfig& flat_index_config, std::size_t cache_size) {
     std::unique_lock lock(engine_mutex_);
     if (!metadata_.primary || shutdown_ || name.empty()) {
         return false;
@@ -318,16 +321,26 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, std::size_
     std::string index_snapshot = name + "_" + kIndexSnapshotFilename;
     std::string write_ahead_log = name + "_" + kWriteAheadLogFilename;
 
-    {
-        auto temporary_persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, VectorPersistenceManager::StoredIndexType::HNSW, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
-        temporary_persistence_manager->AppendCreate(vector_dimensionality, m, m0, ef_construction, ml, distance_metric, cache_size);
+    std::unique_ptr<VectorIndex> index = nullptr;
+    VectorStore::IndexType index_type = VectorStore::IndexType::FLAT;
+    VectorPersistenceManager::StoredIndexType stored_index_type = VectorPersistenceManager::StoredIndexType::FLAT;
+    if (hnsw_index_config.m != 0 && hnsw_index_config.m0 != 0 && hnsw_index_config.ef_construction != 0 && hnsw_index_config.vector_dimensionality != 0) {
+        index = std::make_unique<vector_db_engine::HNSWIndex>(hnsw_index_config);
+        index_type = VectorStore::IndexType::HNSW;
+        stored_index_type = VectorPersistenceManager::StoredIndexType::HNSW;
+    } else {
+        index = std::make_unique<vector_db_engine::FlatIndex>(flat_index_config);
+        index_type = VectorStore::IndexType::FLAT;
+        stored_index_type = VectorPersistenceManager::StoredIndexType::FLAT;
     }
 
-    HNSWIndex::HNSWIndexConfig config = {m, m0, ef_construction, ml, distance_metric, vector_dimensionality};
-    auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(config);
-    auto vector_store = std::make_unique<VectorStore>(VectorStore::IndexType::HNSW, std::move(hnsw_index), vector_dimensionality);
-    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, VectorPersistenceManager::StoredIndexType::HNSW, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
-    auto metrics_manager = std::make_unique<MetricsManager>();
+    {
+        auto temporary_persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
+        temporary_persistence_manager->AppendCreate(hnsw_index_config, flat_index_config, cache_size);
+    }
+
+    auto vector_store = std::make_unique<VectorStore>(index_type, std::move(index), vector_dimensionality);
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, logger_.get());    auto metrics_manager = std::make_unique<MetricsManager>();
     auto stats_manager = std::make_unique<StatsManager>();
     auto lru_cache = std::make_unique<LRUCache>(cache_size);
 
@@ -340,7 +353,7 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, std::size_
     return true;
 }
 
-bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::VectorIndex::DistanceMetric distance_metric, std::size_t cache_size) {
+bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, const HNSWIndex::HNSWIndexConfig& hnsw_index_config, const FlatIndex::FlatIndexConfig& flat_index_config, std::size_t cache_size) {
     if (shutdown_ || name.empty()) {
         return false;
     }
@@ -353,10 +366,20 @@ bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, s
     std::string index_snapshot = name + "_" + kIndexSnapshotFilename;
     std::string write_ahead_log = name + "_" + kWriteAheadLogFilename;
 
-    HNSWIndex::HNSWIndexConfig config = {m, m0, ef_construction, ml, distance_metric, vector_dimensionality};
-    auto hnsw_index = std::make_unique<vector_db_engine::HNSWIndex>(config);
-    auto vector_store = std::make_unique<VectorStore>(VectorStore::IndexType::HNSW, std::move(hnsw_index), vector_dimensionality);
-    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, VectorPersistenceManager::StoredIndexType::HNSW, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
+    std::unique_ptr<VectorIndex> index = nullptr;
+    VectorStore::IndexType index_type = VectorStore::IndexType::FLAT;
+    VectorPersistenceManager::StoredIndexType stored_index_type = VectorPersistenceManager::StoredIndexType::FLAT;
+    if (hnsw_index_config.m != 0 && hnsw_index_config.m0 != 0 && hnsw_index_config.ef_construction != 0 && hnsw_index_config.vector_dimensionality != 0) {
+        index = std::make_unique<vector_db_engine::HNSWIndex>(hnsw_index_config);
+        index_type = VectorStore::IndexType::HNSW;
+        stored_index_type = VectorPersistenceManager::StoredIndexType::HNSW;
+    } else {
+        index = std::make_unique<vector_db_engine::FlatIndex>(flat_index_config);
+        index_type = VectorStore::IndexType::FLAT;
+        stored_index_type = VectorPersistenceManager::StoredIndexType::FLAT;
+    }
+    auto vector_store = std::make_unique<VectorStore>(index_type, std::move(index), vector_dimensionality);
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
     auto metrics_manager = std::make_unique<MetricsManager>();
     auto stats_manager = std::make_unique<StatsManager>();
     auto lru_cache = std::make_unique<LRUCache>(cache_size);
@@ -459,10 +482,12 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
 
         bool ok = false;
         std::unique_lock replica_lock(replica_mutex_);
+        HNSWIndex::HNSWIndexConfig hnsw_index_config = {index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine), store_config.vector_dimensionality()};
+        FlatIndex::FlatIndexConfig flat_index_config;
         if (metadata_.primary) {
-            ok = CreateTable(entry.table(), store_config.vector_dimensionality(), index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine), cache_config.cache_size());
+            ok = CreateTable(entry.table(), store_config.vector_dimensionality(), hnsw_index_config, flat_index_config, cache_config.cache_size());
         } else {
-            ok = CreateTableOnReplica(entry.table(), store_config.vector_dimensionality(), index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine),cache_config.cache_size());
+            ok = CreateTableOnReplica(entry.table(), store_config.vector_dimensionality(), hnsw_index_config, flat_index_config, cache_config.cache_size());
         }
     }
     if (entry.type() == vector_db::WALEntry::DROP) {
