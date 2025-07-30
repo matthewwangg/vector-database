@@ -8,11 +8,14 @@
 
 namespace vector_db_engine {
 
-FlatIndex::FlatIndex(DistanceMetric metric)
-    : metric_(metric)
+FlatIndex::FlatIndex(const FlatIndexConfig& config)
+    : config_(config)
 {}
 
 void FlatIndex::Insert(Id id, const Vector& vector) {
+    if (vector.size() != config_.vector_dimensionality) {
+        return;
+    }
     vectors_.insert({id, vector});
 }
 
@@ -21,6 +24,10 @@ void FlatIndex::Remove(Id id) {
 }
 
 std::vector<Id> FlatIndex::Search(const Vector& query, std::size_t k, std::size_t search_param) const {
+    if (query.size() != config_.vector_dimensionality) {
+        return {};
+    }
+
     std::priority_queue<std::pair<float, Id>> top_k;
     for (const auto& [id, vector] : vectors_) {
         float distance = ComputeDistance(query, vector);
@@ -55,7 +62,7 @@ float FlatIndex::ComputeDistance(const Vector& a, const Vector& b) const {
         return std::numeric_limits<float>::infinity();
     }
 
-    if (metric_ == DistanceMetric::L2) {
+    if (config_.metric == DistanceMetric::L2) {
         float distance = 0.0f;
 
         for (size_t i = 0; i < a.size(); ++i) {
@@ -65,7 +72,7 @@ float FlatIndex::ComputeDistance(const Vector& a, const Vector& b) const {
         return std::sqrt(distance);
     }
 
-    if (metric_ == DistanceMetric::Cosine) {
+    if (config_.metric == DistanceMetric::Cosine) {
         float dot_product = 0.0f;
         float a_norm = 0.0f;
         float b_norm = 0.0f;

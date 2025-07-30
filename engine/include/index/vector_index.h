@@ -2,6 +2,7 @@
 #define VECTOR_DATABASE_VECTOR_INDEX_H
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace vector_db_engine {

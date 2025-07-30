@@ -18,8 +18,9 @@
 
 namespace vector_db_engine {
 
-VectorPersistenceManager::VectorPersistenceManager(std::string name, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path, Logger* logger)
+VectorPersistenceManager::VectorPersistenceManager(std::string name, StoredIndexType stored_index_type, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path, Logger* logger)
     : name_(name),
+      stored_index_type_(stored_index_type),
       store_snapshot_file_path_(GetFullFilepath(store_snapshot_file_path)),
       index_snapshot_file_path_(GetFullFilepath(index_snapshot_file_path)),
       wal_file_path_(GetFullFilepath(wal_file_path)),
@@ -63,21 +64,21 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
     }
 
     vector_db::HNSWIndexSnapshot index_snapshot;
-    index_snapshot.set_m(index->GetM());
-    index_snapshot.set_m0(index->GetM0());
-    index_snapshot.set_ef_construction(index->GetEfConstruction());
-    index_snapshot.set_ml(index->GetML());
-    index_snapshot.set_vector_dimensionality(index->GetVectorDimensionality());
+    index_snapshot.set_m(index->GetConfig().m);
+    index_snapshot.set_m0(index->GetConfig().m0);
+    index_snapshot.set_ef_construction(index->GetConfig().ef_construction);
+    index_snapshot.set_ml(index->GetConfig().ml);
+    index_snapshot.set_vector_dimensionality(index->GetConfig().vector_dimensionality);
     index_snapshot.set_max_level(index->GetMaxLevel());
 
     if (index->GetEntryPoint().has_value()) {
         index_snapshot.set_entry_point(index->GetEntryPoint().value());
     }
 
-    if (index->GetMetric() == VectorIndex::DistanceMetric::L2) {
+    if (index->GetConfig().metric == VectorIndex::DistanceMetric::L2) {
         index_snapshot.set_distance_metric(vector_db::L2);
     }
-    if (index->GetMetric() == VectorIndex::DistanceMetric::Cosine) {
+    if (index->GetConfig().metric == VectorIndex::DistanceMetric::Cosine) {
         index_snapshot.set_distance_metric(vector_db::COSINE);
     }
 
@@ -167,7 +168,8 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
         reconstructed_node_levels[level] = std::move(id_set);
     }
 
-    std::unique_ptr<HNSWIndex> reconstructed_index = std::make_unique<HNSWIndex>(m, m0, ef_construction, ml, distance_metric, vector_dimensionality, max_level, entry_point, reconstructed_nodes, reconstructed_node_levels);
+    HNSWIndex::HNSWIndexConfig config = {m, m0, ef_construction, ml, distance_metric, vector_dimensionality};
+    std::unique_ptr<HNSWIndex> reconstructed_index = std::make_unique<HNSWIndex>(config, max_level, entry_point, reconstructed_nodes, reconstructed_node_levels);
 
     vector_db::StoreSnapshot store_snapshot;
     std::ifstream in_store(store_snapshot_file_path_, std::ios::binary);

@@ -10,7 +10,8 @@ namespace vector_db_engine {
 class HNSWIndexTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        index_ = std::make_unique<HNSWIndex>(2, 4, 16, 1.0f, VectorIndex::DistanceMetric::L2, 4);
+        HNSWIndex::HNSWIndexConfig config = {2, 4, 16, 1.0f, VectorIndex::DistanceMetric::L2, 4};
+        index_ = std::make_unique<HNSWIndex>(config);
     }
 
     std::unique_ptr<HNSWIndex> index_;
@@ -43,7 +44,8 @@ TEST_F(HNSWIndexTest, SuccessSearchL2) {
 }
 
 TEST_F(HNSWIndexTest, SuccessSearchCosine) {
-    index_ = std::make_unique<HNSWIndex>(2, 4, 16, 1.0f, VectorIndex::DistanceMetric::Cosine, 4);
+    HNSWIndex::HNSWIndexConfig config = {2, 4, 16, 1.0f, VectorIndex::DistanceMetric::Cosine, 4};
+    index_ = std::make_unique<HNSWIndex>(config);
 
     index_->Insert(1, {0.5f, 0.4f, 0.6f, 0.2f});
     index_->Insert(2, {0.5f, 0.4f, 0.6f, 0.2f});
