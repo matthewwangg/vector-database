@@ -19,16 +19,17 @@
 
 namespace vector_db_engine {
 
-VectorPersistenceManager::VectorPersistenceManager(std::string name, StoredIndexType stored_index_type, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path, Logger* logger)
+VectorPersistenceManager::VectorPersistenceManager(std::string name, StoredIndexType stored_index_type, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path, std::string metadata_file_path, Logger* logger)
     : name_(name),
       stored_index_type_(stored_index_type),
       store_snapshot_file_path_(GetFullFilepath(store_snapshot_file_path)),
       index_snapshot_file_path_(GetFullFilepath(index_snapshot_file_path)),
       wal_file_path_(GetFullFilepath(wal_file_path)),
+      metadata_file_path_(GetFullFilepath(metadata_file_path)),
       logger_(logger)
 {
     const std::string base = std::string(std::getenv("HOME")) + "/.vector_db/" + name_ + "/";
-    const std::string suffix = "_wal.log";
+    const std::string suffix = "_metadata.bin";
     table_name_ = wal_file_path_.substr(base.size(), wal_file_path_.size() - base.size() - suffix.size());
 
     wal_out_.open(wal_file_path_, std::ios::app);
@@ -274,6 +275,30 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
     return std::move(loaded_store);
 }
 
+void VectorPersistenceManager::SaveMetadata(int vector_dimensionality, const HNSWIndex::HNSWIndexConfig& hnsw_index_config, const FlatIndex::FlatIndexConfig& flat_index_config, std::size_t cache_size) const {
+    vector_db::TableMetadata table_metadata;
+    table_metadata.set_table_name(table_name_);
+    table_metadata.set_vector_dimensionality(vector_dimensionality);
+    table_metadata.set_cache_size(cache_size);
+
+    if (hnsw_index_config.m != 0 && hnsw_index_config.m0 != 0 && hnsw_index_config.ef_construction != 0 && hnsw_index_config.vector_dimensionality != 0) {
+        table_metadata.set_index_type(vector_db::TableMetadata::HNSW);
+        table_metadata.mutable_hnsw_index_config()->set_m(hnsw_index_config.m);
+        table_metadata.mutable_hnsw_index_config()->set_m0(hnsw_index_config.m0);
+        table_metadata.mutable_hnsw_index_config()->set_ef_construction(hnsw_index_config.ef_construction);
+        table_metadata.mutable_hnsw_index_config()->set_ml(hnsw_index_config.ml);
+        table_metadata.mutable_hnsw_index_config()->set_distance_metric(static_cast<vector_db::DistanceMetric>(hnsw_index_config.metric));
+        table_metadata.mutable_hnsw_index_config()->set_vector_dimensionality(hnsw_index_config.vector_dimensionality);
+    } else {
+        table_metadata.set_index_type(vector_db::TableMetadata::FLAT);
+        table_metadata.mutable_flat_index_config()->set_distance_metric(static_cast<vector_db::DistanceMetric>(flat_index_config.metric));
+        table_metadata.mutable_flat_index_config()->set_vector_dimensionality(flat_index_config.vector_dimensionality);
+    }
+
+    std::ofstream out(metadata_file_path_, std::ios::binary);
+    table_metadata.SerializeToOstream(&out);
+}
+
 void VectorPersistenceManager::AppendInsert(Id id, const Vector& vector, const std::string& content) {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
     wal_out_ << "insert " << id;
@@ -429,6 +454,7 @@ void VectorPersistenceManager::Clear() {
     std::filesystem::remove(store_snapshot_file_path_);
     std::filesystem::remove(index_snapshot_file_path_);
     std::filesystem::remove(wal_file_path_);
+    std::filesystem::remove(metadata_file_path_);
 }
 
 std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(int offset) {

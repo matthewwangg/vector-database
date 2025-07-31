@@ -17,7 +17,7 @@ class PersistenceManagerTest : public ::testing::Test {
 protected:
     void SetUp() override {
         logger_ = std::make_unique<LocalLogger>();
-        persistence_manager_ = std::make_unique<VectorPersistenceManager>("unit_test", VectorPersistenceManager::StoredIndexType::HNSW, "unit_test_store_snapshot.dat", "unit_test_index_snapshot.dat", "unit_test_wal.log", logger_.get());
+        persistence_manager_ = std::make_unique<VectorPersistenceManager>("unit_test", VectorPersistenceManager::StoredIndexType::HNSW, "unit_test_store_snapshot.dat", "unit_test_index_snapshot.dat", "unit_test_wal.log", "unit_test_metadata.bin", logger_.get());
 
         HNSWIndex::HNSWIndexConfig config = {2, 4, 16, 1.0f, VectorIndex::DistanceMetric::L2, 4};
         auto index = std::make_unique<HNSWIndex>(config);
@@ -65,7 +65,7 @@ TEST_F(PersistenceManagerTest, SaveAndLoadSnapshotWithHNSWIndex) {
 }
 
 TEST_F(PersistenceManagerTest, SaveAndLoadSnapshotWithFlatIndex) {
-    auto persistence_manager = std::make_unique<VectorPersistenceManager>("unit_test_flat", VectorPersistenceManager::StoredIndexType::FLAT, "unit_test_store_snapshot.dat", "unit_test_index_snapshot.dat", "unit_test_wal.log", logger_.get());
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>("unit_test_flat", VectorPersistenceManager::StoredIndexType::FLAT, "unit_test_store_snapshot.dat", "unit_test_index_snapshot.dat", "unit_test_wal.log", "unit_test_metadata.bin", logger_.get());
     FlatIndex::FlatIndexConfig config = {4, VectorIndex::DistanceMetric::L2};
     auto index = std::make_unique<FlatIndex>(config);
     auto store = std::make_unique<VectorStore>(VectorStore::IndexType::FLAT, std::move(index), 4);

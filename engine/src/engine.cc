@@ -25,6 +25,7 @@
 #include "replica_manager_service_impl.h"
 #include "replica.grpc.pb.h"
 #include "replica.pb.h"
+#include "storage.pb.h"
 
 namespace vector_db_engine {
 
@@ -33,6 +34,7 @@ constexpr int kShutdownCheckInterval = 1000;
 inline const std::string kStoreSnapshotFilename = "store_snapshot.dat";
 inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
 inline const std::string kWriteAheadLogFilename = "wal.log";
+inline const std::string kMetadataFilename = "metadata.bin";
 
 Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string sync_server_address, std::vector<std::string> replicas)
     : shutdown_(false)
@@ -87,9 +89,34 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     logger_.get());
 
     for (const std::string& table : table_names) {
-        HNSWIndex::HNSWIndexConfig hnsw_index_config = {16, 32, 64, 1.0f, vector_db_engine::VectorIndex::DistanceMetric::L2, 384};
-        FlatIndex::FlatIndexConfig flat_index_config; // fix
-        bool ok = CreateTable(table, 384, hnsw_index_config, flat_index_config, 32);
+        int vector_dimensionality;
+        std::size_t cache_size;
+        HNSWIndex::HNSWIndexConfig hnsw_index_config = {};
+        FlatIndex::FlatIndexConfig flat_index_config = {};
+
+        [&]() {
+            std::string filepath = std::string(std::getenv("HOME")) + "/.vector_db/" + metadata_.name + "/" + table + "_" + kMetadataFilename;
+            std::ifstream in(filepath, std::ios::binary);
+            if (!in) {
+                std::cout << "failed to open " << filepath << std::endl;
+                return;
+            }
+            vector_db::TableMetadata table_metadata;
+            table_metadata.ParseFromIstream(&in);
+
+            vector_dimensionality = table_metadata.vector_dimensionality();
+            cache_size = table_metadata.cache_size();
+
+            if (table_metadata.index_type() == vector_db::TableMetadata::HNSW) {
+                vector_db::TableMetadata::HNSWIndexConfig config = table_metadata.hnsw_index_config();
+                hnsw_index_config = {config.m(), config.m0(), config.ef_construction(), config.ml(), static_cast<VectorIndex::DistanceMetric>(config.distance_metric()), config.vector_dimensionality()};
+            } else {
+                vector_db::TableMetadata::FlatIndexConfig config = table_metadata.flat_index_config();
+                flat_index_config = {config.vector_dimensionality(), static_cast<VectorIndex::DistanceMetric>(config.distance_metric())};
+            }
+        }();
+
+        bool ok = CreateTable(table, vector_dimensionality, hnsw_index_config, flat_index_config, cache_size);
         if (!ok) {
             continue;
         }
@@ -114,6 +141,7 @@ Engine::~Engine() {
         Cleanup(table, true);
         replica_manager_->Sync(true);
         persistence_manager_map_[table]->SaveSnapshot(*store);
+        persistence_manager_map_[table]->SaveMetadata(store->GetVectorDimensionality(), (store->GetIndexType() == VectorStore::IndexType::HNSW ? dynamic_cast<const HNSWIndex*>(store->GetIndex())->GetConfig() : HNSWIndex::HNSWIndexConfig{}), (store->GetIndexType() == VectorStore::IndexType::FLAT ? dynamic_cast<const FlatIndex*>(store->GetIndex())->GetConfig() : FlatIndex::FlatIndexConfig{}), (cache_map_.contains(table) ? dynamic_cast<const LRUCache*>(cache_map_.at(table).get())->GetMaxCacheSize() : 32));
         persistence_manager_map_[table]->ClearWAL();
     }
 }
@@ -320,6 +348,7 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, const HNSW
     std::string store_snapshot = name + "_" + kStoreSnapshotFilename;
     std::string index_snapshot = name + "_" + kIndexSnapshotFilename;
     std::string write_ahead_log = name + "_" + kWriteAheadLogFilename;
+    std::string metadata = name + "_" + kMetadataFilename;
 
     std::unique_ptr<VectorIndex> index = nullptr;
     VectorStore::IndexType index_type = VectorStore::IndexType::FLAT;
@@ -335,12 +364,12 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, const HNSW
     }
 
     {
-        auto temporary_persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
+        auto temporary_persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, metadata, logger_.get());
         temporary_persistence_manager->AppendCreate(hnsw_index_config, flat_index_config, cache_size);
     }
 
     auto vector_store = std::make_unique<VectorStore>(index_type, std::move(index), vector_dimensionality);
-    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, metadata, logger_.get());
     auto metrics_manager = std::make_unique<MetricsManager>();
     auto stats_manager = std::make_unique<StatsManager>();
     auto lru_cache = std::make_unique<LRUCache>(cache_size);
@@ -366,6 +395,7 @@ bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, c
     std::string store_snapshot = name + "_" + kStoreSnapshotFilename;
     std::string index_snapshot = name + "_" + kIndexSnapshotFilename;
     std::string write_ahead_log = name + "_" + kWriteAheadLogFilename;
+    std::string metadata = name + "_" + kMetadataFilename;
 
     std::unique_ptr<VectorIndex> index = nullptr;
     VectorStore::IndexType index_type = VectorStore::IndexType::FLAT;
@@ -381,7 +411,7 @@ bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, c
     }
 
     auto vector_store = std::make_unique<VectorStore>(index_type, std::move(index), vector_dimensionality);
-    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, logger_.get());
+    auto persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, metadata, logger_.get());
     auto metrics_manager = std::make_unique<MetricsManager>();
     auto stats_manager = std::make_unique<StatsManager>();
     auto lru_cache = std::make_unique<LRUCache>(cache_size);

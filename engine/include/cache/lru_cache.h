@@ -19,6 +19,8 @@ public:
     void Invalidate(const CacheKey& key) override;
     void Store(const CacheKey& key, const CacheEntry& entry) override;
 
+    std::size_t GetMaxCacheSize() const { return max_cache_size_; }
+
 private:
     std::unordered_map<CacheKey, std::pair<CacheEntry, std::list<CacheKey>::iterator>> cache_;
     std::list<CacheKey> keys_;
