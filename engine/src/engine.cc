@@ -509,13 +509,14 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
     if (entry.type() == vector_db::WALEntry::CREATE) {
         const auto& config = entry.create_config();
         const auto& store_config = config.store_config();
-        const auto& index_config = config.hnsw_index_config(); // FIX
+        auto& hnsw_config = config.hnsw_index_config();
+        auto& flat_config = config.flat_index_config();
         const auto& cache_config = config.cache_config();
 
         bool ok = false;
         std::unique_lock replica_lock(replica_mutex_);
-        HNSWIndex::HNSWIndexConfig hnsw_index_config = {index_config.m(), index_config.m0(), index_config.ef_construction(), index_config.ml(), (index_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine), store_config.vector_dimensionality()};
-        FlatIndex::FlatIndexConfig flat_index_config; // fix
+        HNSWIndex::HNSWIndexConfig hnsw_index_config = {hnsw_config.m(), hnsw_config.m0(), hnsw_config.ef_construction(), hnsw_config.ml(), (hnsw_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine), hnsw_config.vector_dimensionality()};
+        FlatIndex::FlatIndexConfig flat_index_config = {flat_config.vector_dimensionality(), (flat_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine)};
         if (metadata_.primary) {
             ok = CreateTable(entry.table(), store_config.vector_dimensionality(), hnsw_index_config, flat_index_config, cache_config.cache_size());
         } else {

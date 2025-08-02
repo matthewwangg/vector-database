@@ -29,7 +29,7 @@ VectorPersistenceManager::VectorPersistenceManager(std::string name, StoredIndex
       logger_(logger)
 {
     const std::string base = std::string(std::getenv("HOME")) + "/.vector_db/" + name_ + "/";
-    const std::string suffix = "_metadata.bin";
+    const std::string suffix = "_wal.log";
     table_name_ = wal_file_path_.substr(base.size(), wal_file_path_.size() - base.size() - suffix.size());
 
     wal_out_.open(wal_file_path_, std::ios::app);
@@ -411,6 +411,7 @@ void VectorPersistenceManager::ReplayWAL(const std::function<void(const vector_d
                 entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric(
                         (distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::L2
                                                         : vector_db::WALEntry::CreateConfig::COSINE));
+                entry.mutable_create_config()->mutable_hnsw_index_config()->set_vector_dimensionality(vector_dimensionality);
                 entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
             } else {
                 stream >> vector_dimensionality;
@@ -421,6 +422,7 @@ void VectorPersistenceManager::ReplayWAL(const std::function<void(const vector_d
                 entry.mutable_create_config()->mutable_flat_index_config()->set_distance_metric(
                         (distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::L2
                                                         : vector_db::WALEntry::CreateConfig::COSINE));
+                entry.mutable_create_config()->mutable_flat_index_config()->set_vector_dimensionality(vector_dimensionality);
                 entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
             }
         }
@@ -512,6 +514,7 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(i
             entry.mutable_remove_config()->set_id(id);
         }
         if (command == "create")  {
+            entry.set_type(vector_db::WALEntry::CREATE);
             int vector_dimensionality;
             std::string distance_metric_string;
             std::size_t cache_size;
@@ -538,6 +541,7 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(i
                 entry.mutable_create_config()->mutable_hnsw_index_config()->set_distance_metric(
                         (distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::L2
                                                         : vector_db::WALEntry::CreateConfig::COSINE));
+                entry.mutable_create_config()->mutable_hnsw_index_config()->set_vector_dimensionality(vector_dimensionality);
                 entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
             } else {
                 stream >> vector_dimensionality;
@@ -548,6 +552,7 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(i
                 entry.mutable_create_config()->mutable_flat_index_config()->set_distance_metric(
                         (distance_metric_string == "L2" ? vector_db::WALEntry::CreateConfig::L2
                                                         : vector_db::WALEntry::CreateConfig::COSINE));
+                entry.mutable_create_config()->mutable_flat_index_config()->set_vector_dimensionality(vector_dimensionality);
                 entry.mutable_create_config()->mutable_cache_config()->set_cache_size(cache_size);
             }
         }
