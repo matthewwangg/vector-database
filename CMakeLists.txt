@@ -25,13 +25,13 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(vector_db_tests
         engine/tests/hnsw_index_test.cc
+        engine/tests/flat_index_test.cc
         engine/tests/vector_store_test.cc
         engine/tests/persistence_manager_test.cc
         engine/tests/engine_test.cc
         engine/tests/stats_manager_test.cc
         engine/tests/metrics_manager_test.cc
         server/tests/vector_database_test.cc
-        engine/tests/flat_index_test.cc
 )
 
 target_link_libraries(vector_db_tests

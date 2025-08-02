@@ -13,28 +13,18 @@
 
 namespace vector_db_engine {
 
-HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality)
-    : m_(m),
-      m0_(m0),
-      ef_construction_(ef_construction),
-      ml_(ml),
+HNSWIndex::HNSWIndex(const HNSWIndexConfig& config)
+    : config_(config),
       max_level_(-1),
       random_engine_(std::random_device{}()),
-      level_distribution_(0.0, 1.0),
-      metric_(metric),
-      vector_dimensionality_(vector_dimensionality)
+      level_distribution_(0.0, 1.0)
 {}
 
-HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality, int max_level, std::optional<Id> entry_point, std::unordered_map<Id, Node> nodes, std::unordered_map<int, std::unordered_set<Id>> node_levels)
-    : m_(m),
-      m0_(m0),
-      ef_construction_(ef_construction),
-      ml_(ml),
+HNSWIndex::HNSWIndex(const HNSWIndexConfig& config, int max_level, std::optional<Id> entry_point, std::unordered_map<Id, Node> nodes, std::unordered_map<int, std::unordered_set<Id>> node_levels)
+    : config_(config),
       max_level_(max_level),
       random_engine_(std::random_device{}()),
       level_distribution_(0.0, 1.0),
-      metric_(metric),
-      vector_dimensionality_(vector_dimensionality),
       entry_point_(entry_point),
       nodes_(nodes),
       node_levels_(node_levels)
@@ -52,7 +42,7 @@ HNSWIndex::HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction,
 void HNSWIndex::Insert(Id id, const Vector& vector) {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
 
-    if (vector.size() != vector_dimensionality_ || nodes_.contains(id)) {
+    if (vector.size() != config_.vector_dimensionality || nodes_.contains(id)) {
         return;
     }
 
@@ -83,7 +73,7 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
     }
 
     for (int l = std::min(max_level_, new_level); l > -1; --l) {
-        std::vector<Id> nearest = SearchLevel(vector, entry_point, ef_construction_, l);
+        std::vector<Id> nearest = SearchLevel(vector, entry_point, config_.ef_construction, l);
         std::vector<Id> neighbors = SelectNeighbors(vector, nearest, l);
 
         ConnectNeighbors(id, vector, neighbors, l);
@@ -224,9 +214,9 @@ std::vector<Id> HNSWIndex::SelectNeighbors(const Vector& query, const std::vecto
     }
     std::sort(candidate_distances.begin(), candidate_distances.end());
 
-    std::size_t max_neighbors = m_;
+    std::size_t max_neighbors = config_.m;
     if (level == 0) {
-        max_neighbors = m0_;
+        max_neighbors = config_.m0;
     }
 
     std::vector<Id> assigned_neighbors;
@@ -283,7 +273,7 @@ void HNSWIndex::Reindex() {
 }
 
 void HNSWIndex::InsertNoLock(Id id, const Vector& vector) {
-    if (vector.size() != vector_dimensionality_ || nodes_.contains(id)) {
+    if (vector.size() != config_.vector_dimensionality || nodes_.contains(id)) {
         return;
     }
 
@@ -314,7 +304,7 @@ void HNSWIndex::InsertNoLock(Id id, const Vector& vector) {
     }
 
     for (int l = std::min(max_level_, new_level); l > -1; --l) {
-        std::vector<Id> nearest = SearchLevel(vector, entry_point, ef_construction_, l);
+        std::vector<Id> nearest = SearchLevel(vector, entry_point, config_.ef_construction, l);
         std::vector<Id> neighbors = SelectNeighbors(vector, nearest, l);
 
         ConnectNeighbors(id, vector, neighbors, l);
@@ -331,7 +321,7 @@ float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {
         return std::numeric_limits<float>::infinity();
     }
 
-    if (metric_ == DistanceMetric::L2) {
+    if (config_.metric == DistanceMetric::L2) {
         float distance = 0.0f;
 
         for (size_t i = 0; i < a.size(); ++i) {
@@ -341,7 +331,7 @@ float HNSWIndex::ComputeDistance(const Vector& a, const Vector& b) const {
         return std::sqrt(distance);
     }
 
-    if (metric_ == DistanceMetric::Cosine) {
+    if (config_.metric == DistanceMetric::Cosine) {
         float dot_product = 0.0f;
         float a_norm = 0.0f;
         float b_norm = 0.0f;
@@ -374,9 +364,9 @@ void HNSWIndex::ConnectNeighbors(Id node_id, const Vector& vector, const std::ve
 
         auto& e_conn = nodes_[neighbor_id].neighbors[level];
 
-        std::size_t max_neighbors = m_;
+        std::size_t max_neighbors = config_.m;
         if (level == 0) {
-            max_neighbors = m0_;
+            max_neighbors = config_.m0;
         }
 
         if (e_conn.size() > max_neighbors) {
@@ -399,7 +389,7 @@ void HNSWIndex::ConnectNeighbors(Id node_id, const Vector& vector, const std::ve
 
 int HNSWIndex::GetRandomLevel(Id id) const {
     std::mt19937 random_engine(std::hash<Id>{}(id));
-    return static_cast<int>(-std::log(1.0 - level_distribution_(random_engine)) * ml_);
+    return static_cast<int>(-std::log(1.0 - level_distribution_(random_engine)) * config_.ml);
 }
 
 } // namespace vector_db_engine

@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <random>
 #include <shared_mutex>
@@ -16,6 +17,15 @@ namespace vector_db_engine {
 
 class HNSWIndex : public VectorIndex {
 public:
+    struct HNSWIndexConfig {
+        std::size_t m;
+        std::size_t m0;
+        std::size_t ef_construction;
+        float ml;
+        DistanceMetric metric;
+        int vector_dimensionality;
+    };
+
     struct Node {
         Vector vector;
         int level;
@@ -23,8 +33,8 @@ public:
         bool active;
     };
 
-    explicit HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality);
-    explicit HNSWIndex(std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, DistanceMetric metric, int vector_dimensionality, int max_level, std::optional<Id> entry_point, std::unordered_map<Id, Node> nodes, std::unordered_map<int, std::unordered_set<Id>> node_levels);
+    explicit HNSWIndex(const HNSWIndexConfig& config);
+    explicit HNSWIndex(const HNSWIndexConfig& config, int max_level, std::optional<Id> entry_point, std::unordered_map<Id, Node> nodes, std::unordered_map<int, std::unordered_set<Id>> node_levels);
 
     void Insert(Id id, const Vector& vector) override;
     void Remove(Id id) override;
@@ -36,12 +46,7 @@ public:
     const std::unordered_map<Id, Node>& GetNodes() const { return nodes_; }
     const std::unordered_map<int, std::unordered_set<Id>>& GetNodeLevels() const { return node_levels_; }
 
-    std::size_t GetM() const { return m_; }
-    std::size_t GetM0() const { return m0_; }
-    std::size_t GetEfConstruction() const { return ef_construction_; }
-    float GetML() const { return ml_; }
-    DistanceMetric GetMetric() const { return metric_; }
-    int GetVectorDimensionality() const { return vector_dimensionality_; }
+    HNSWIndexConfig GetConfig() const { return config_; }
 
     int GetMaxLevel() const { return max_level_; }
     std::optional<Id> GetEntryPoint() const { return entry_point_; }
@@ -56,19 +61,13 @@ private:
     void ConnectNeighbors(Id node_id, const Vector& vector, const std::vector<Id>& neighbors, int level);
     int GetRandomLevel(Id id) const;
 
+    HNSWIndexConfig config_;
+
     std::unordered_map<Id, Node> nodes_;
     std::unordered_map<int, std::unordered_set<Id>> node_levels_;
 
-    int vector_dimensionality_;
-
     int max_level_;
     std::optional<Id> entry_point_;
-
-    std::size_t ef_construction_;
-    std::size_t m_;
-    std::size_t m0_;
-    float ml_;
-    DistanceMetric metric_;
 
     mutable std::mt19937 random_engine_;
     mutable std::uniform_real_distribution<> level_distribution_;

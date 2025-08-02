@@ -2,6 +2,8 @@
 #define VECTOR_DATABASE_FLAT_INDEX_H
 
 #include <cstdint>
+#include <memory>
+#include <shared_mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -11,7 +13,13 @@ namespace vector_db_engine {
 
 class FlatIndex : public VectorIndex {
 public:
-    explicit FlatIndex(DistanceMetric metric);
+    struct FlatIndexConfig {
+        int vector_dimensionality;
+        DistanceMetric metric;
+    };
+
+    explicit FlatIndex(const FlatIndexConfig& config);
+    explicit FlatIndex(const FlatIndexConfig& config, std::unordered_map<Id, Vector> vectors);
 
     void Insert(Id id, const Vector& vector) override;
     void Remove(Id id) override;
@@ -20,12 +28,17 @@ public:
     void Cleanup() override;
     void Reindex() override;
 
+    FlatIndexConfig GetConfig() const { return config_; }
+    std::unordered_map<Id, Vector> GetVectors() const { return vectors_; }
+
 private:
     float ComputeDistance(const Vector& a, const Vector& b) const;
 
     std::unordered_map<Id, Vector> vectors_;
 
-    DistanceMetric metric_;
+    FlatIndexConfig config_;
+
+    mutable std::shared_mutex rw_mutex_;
 };
 
 } // namespace vector_db_engine

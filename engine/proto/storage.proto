@@ -45,10 +45,43 @@ message IdSet {
 
 message FlatIndexSnapshot {
   DistanceMetric distance_metric = 1;
+  int32 vector_dimensionality = 2;
 
-  map<uint64, Vector> vectors = 2;
+  map<uint64, Vector> vectors = 3;
 }
 
 message Vector {
   repeated float vector = 1;
+}
+
+message TableMetadata {
+  string table_name = 1;
+  int32 vector_dimensionality = 2;
+
+  enum IndexType {
+    HNSW = 0;
+    FLAT = 1;
+  }
+
+  IndexType index_type = 4;
+
+  message HNSWIndexConfig {
+    uint64 m = 1;
+    uint64 m0 = 2;
+    uint64 ef_construction = 3;
+    float ml = 4;
+    int32 vector_dimensionality = 5;
+
+    DistanceMetric distance_metric = 6;
+  }
+
+  message FlatIndexConfig {
+    DistanceMetric distance_metric = 1;
+    int32 vector_dimensionality = 2;
+  }
+
+  HNSWIndexConfig hnsw_index_config = 5;
+  FlatIndexConfig flat_index_config = 6;
+
+  uint64 cache_size = 7;
 }

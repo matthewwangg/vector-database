@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "engine.h"
+#include "flat_index.h"
 #include "hnsw_index.h"
 #include "metrics_manager.h"
 #include "stats_manager.h"
@@ -152,23 +153,39 @@ grpc::Status VectorDatabaseServiceImpl::Metrics(grpc::ServerContext* context, co
 grpc::Status VectorDatabaseServiceImpl::CreateTable(grpc::ServerContext* context, const vector_db::CreateTableRequest* request, vector_db::CreateTableResponse* response) {
     std::string name = request->name();
     int vector_dimensionality = request->store_config().vector_dimensionality();
-    std::size_t m = request->hnsw_index_config().m();
-    std::size_t m0 = request->hnsw_index_config().m0();
-    std::size_t ef_construction = request->hnsw_index_config().ef_construction();
-    float ml = request->hnsw_index_config().ml();
     std::size_t cache_size = request->cache_config().cache_size();
-    if (name.empty() || vector_dimensionality == 0 || m == 0 || m0 == 0 || ef_construction == 0 || ml == 0.0f) {
-        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing arguments");
-    }
 
-    vector_db_engine::VectorIndex::DistanceMetric distance_metric;
-    if (request->hnsw_index_config().distance_metric() == vector_db::CreateTableRequest_DistanceMetric_L2) {
-        distance_metric = vector_db_engine::VectorIndex::DistanceMetric::L2;
+    vector_db_engine::HNSWIndex::HNSWIndexConfig hnsw_index_config;
+    vector_db_engine::FlatIndex::FlatIndexConfig flat_index_config;
+    if (request->has_hnsw_index_config()) {
+        std::size_t m = request->hnsw_index_config().m();
+        std::size_t m0 = request->hnsw_index_config().m0();
+        std::size_t ef_construction = request->hnsw_index_config().ef_construction();
+        float ml = request->hnsw_index_config().ml();
+        if (name.empty() || vector_dimensionality == 0 || m == 0 || m0 == 0 || ef_construction == 0 || ml == 0.0f) {
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing arguments");
+        }
+
+        vector_db_engine::VectorIndex::DistanceMetric distance_metric;
+        if (request->hnsw_index_config().distance_metric() == vector_db::CreateTableRequest_DistanceMetric_L2) {
+            distance_metric = vector_db_engine::VectorIndex::DistanceMetric::L2;
+        } else {
+            distance_metric = vector_db_engine::VectorIndex::DistanceMetric::Cosine;
+        }
+        hnsw_index_config = {m, m0, ef_construction, ml, distance_metric, vector_dimensionality};
+    } else if (request->has_flat_index_config()) {
+        vector_db_engine::VectorIndex::DistanceMetric distance_metric;
+        if (request->flat_index_config().distance_metric() == vector_db::CreateTableRequest_DistanceMetric_L2) {
+            distance_metric = vector_db_engine::VectorIndex::DistanceMetric::L2;
+        } else {
+            distance_metric = vector_db_engine::VectorIndex::DistanceMetric::Cosine;
+        }
+        flat_index_config = {vector_dimensionality, distance_metric};
     } else {
-        distance_metric = vector_db_engine::VectorIndex::DistanceMetric::Cosine;
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "missing index config");
     }
 
-    bool ok = engine_->CreateTable(name, vector_dimensionality, m, m0, ef_construction, ml, distance_metric, cache_size);
+    bool ok = engine_->CreateTable(name, vector_dimensionality, hnsw_index_config, flat_index_config, cache_size);
     response->set_successful(ok);
 
     return grpc::Status::OK;

@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "flat_index.h"
 #include "hnsw_index.h"
 #include "logger.h"
 #include "vector_store.h"
@@ -22,14 +23,21 @@ using Vector = std::vector<float>;
 
 class VectorPersistenceManager {
 public:
-    VectorPersistenceManager(std::string name, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path, Logger* logger);
+    enum class StoredIndexType {
+        HNSW = 0,
+        FLAT = 1,
+    };
+
+    VectorPersistenceManager(std::string name, StoredIndexType stored_index_type, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path, std::string metadata_file_path, Logger* logger);
 
     void SaveSnapshot(const VectorStore& store) const;
     std::unique_ptr<VectorStore> LoadSnapshot() const;
 
+    void SaveMetadata(int vector_dimensionality, const HNSWIndex::HNSWIndexConfig& hnsw_index_config, const FlatIndex::FlatIndexConfig& flat_index_config, std::size_t cache_size) const;
+
     void AppendInsert(Id id, const Vector& vector, const std::string& content);
     void AppendRemove(Id id);
-    void AppendCreate(int vector_dimensionality, std::size_t m, std::size_t m0, std::size_t ef_construction, float ml, vector_db_engine::VectorIndex::DistanceMetric distance_metric, std::size_t cache_size);
+    void AppendCreate(const HNSWIndex::HNSWIndexConfig& hnsw_index_config, const FlatIndex::FlatIndexConfig& flat_index_config, std::size_t cache_size);
     void AppendDrop();
 
     void ReplayWAL(const std::function<void(const vector_db::WALEntry&)>& callback);
@@ -43,6 +51,9 @@ private:
 
     std::string name_;
     std::string table_name_;
+
+    StoredIndexType stored_index_type_;
+    std::string metadata_file_path_;
 
     std::string store_snapshot_file_path_;
     std::string index_snapshot_file_path_;
