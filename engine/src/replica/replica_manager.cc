@@ -20,6 +20,7 @@ namespace vector_db_engine {
 
 constexpr int kSyncInterval = 90;
 constexpr int kShutdownCheckInterval = 1000;
+constexpr int kRetryCount = 3;
 
 ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, const std::function<void(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, Logger* logger)
     : name_(name),
@@ -105,12 +106,16 @@ void ReplicaManager::Sync(bool force) {
         }
 
         for (const auto& replica : replicas_) {
-            auto stub = vector_db::ReplicaManager::NewStub(grpc::CreateChannel(replica, grpc::InsecureChannelCredentials()));
-            vector_db::SyncResponse response;
-            grpc::ClientContext context;
-            grpc::Status status = stub->Sync(&context, request, &response);
-            if (!status.ok()) {
-                logger_->Error("error in updating replica: " + replica, name_);
+            for (int i = 0; i < kRetryCount; ++i) {
+                auto stub = vector_db::ReplicaManager::NewStub(grpc::CreateChannel(replica, grpc::InsecureChannelCredentials()));
+                vector_db::SyncResponse response;
+                grpc::ClientContext context;
+                grpc::Status status = stub->Sync(&context, request, &response);
+                if (status.ok()) {
+                    break;
+                } else {
+                    logger_->Error("error in updating replica: " + replica, name_);
+                }
             }
         }
 
