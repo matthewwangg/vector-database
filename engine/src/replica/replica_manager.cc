@@ -22,12 +22,13 @@ constexpr int kSyncInterval = 90;
 constexpr int kShutdownCheckInterval = 1000;
 constexpr int kRetryCount = 3;
 
-ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, const std::function<void(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, Logger* logger)
+ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, std::atomic<bool>& modified, const std::function<void(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, Logger* logger)
     : name_(name),
       primary_(primary),
       sync_server_address_(sync_server_address),
       replicas_(replicas),
       shutdown_(shutdown),
+      modified_(modified),
       apply_callback_(apply_callback),
       get_persistence_manager_map_callback_(get_persistence_manager_map_callback),
       logger_(logger)
@@ -80,6 +81,10 @@ void ReplicaManager::RunReplicaSyncLoop() {
             break;
         }
 
+        if (!modified_) {
+            continue;
+        }
+
         auto start = std::chrono::steady_clock::now();
         Sync(false);
         auto end = std::chrono::steady_clock::now();
@@ -121,6 +126,7 @@ void ReplicaManager::Sync(bool force) {
 
         wal_offsets_map_[table] += entries.size();
     }
+    modified_ = false;
 }
 
 void ReplicaManager::ApplyWALEntry(const vector_db::WALEntry& entry) {
