@@ -41,6 +41,12 @@ ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_
 }
 
 ReplicaManager::~ReplicaManager() {
+    if (primary_) {
+        {
+            std::unique_lock<std::mutex> lock(sync_mutex_);
+        }
+        sync_cv_.notify_one();
+    }
     if (sync_thread_.joinable()) {
         sync_thread_.join();
     }
