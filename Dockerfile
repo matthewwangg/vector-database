@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:24.04 AS builder
 
 WORKDIR /vector-database
 
@@ -28,4 +28,15 @@ RUN protoc --proto_path=engine/proto \
 
 RUN cmake -S . -B build && cmake --build build -j
 
-ENTRYPOINT ["./build/server/vector_db_server"]
+FROM ubuntu:24.04
+
+WORKDIR /vector-database
+
+RUN apt-get update && apt-get install -y \
+    libprotobuf-dev \
+    libgrpc++-dev \
+    libprotoc-dev
+
+COPY --from=builder /vector-database/build/server/vector_db_server .
+
+ENTRYPOINT ["./vector_db_server"]
