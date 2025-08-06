@@ -14,6 +14,7 @@
 #include "cleaner.h"
 #include "flat_index.h"
 #include "hnsw_index.h"
+#include "input_validator.h"
 #include "local_logger.h"
 #include "logger.h"
 #include "metrics_manager.h"
@@ -67,6 +68,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     }();
 
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
+    input_validator_ = std::make_unique<InputValidator>();
     logger_ = std::make_unique<LocalLogger>();
 
     replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, shutdown_, modified_,
@@ -149,7 +151,11 @@ Engine::~Engine() {
 
 bool Engine::Insert(std::string table_name, Id id, const Vector& vector, const std::string& content) {
     std::shared_lock lock(engine_mutex_);
-    if (!metadata_.primary || shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_manager_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
+    if (!metadata_.primary || shutdown_ || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_manager_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
+        return false;
+    }
+
+    if (!input_validator_->ValidateInsert(table_name, id, vector, content)) {
         return false;
     }
 
@@ -166,7 +172,11 @@ bool Engine::Insert(std::string table_name, Id id, const Vector& vector, const s
 
 bool Engine::Remove(std::string table_name, Id id) {
     std::shared_lock lock(engine_mutex_);
-    if (!metadata_.primary || shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_manager_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
+    if (!metadata_.primary || shutdown_ || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_manager_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
+        return false;
+    }
+
+    if (!input_validator_->ValidateRemove(table_name, id)) {
         return false;
     }
 
@@ -185,7 +195,11 @@ bool Engine::Remove(std::string table_name, Id id) {
 
 std::vector<VectorStore::Data> Engine::Search(std::string table_name, const Vector& query, std::size_t k, std::size_t search_param) {
     std::shared_lock lock(engine_mutex_);
-    if (shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
+    if (shutdown_ || (!store_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
+        return {};
+    }
+
+    if (!input_validator_->ValidateSearch(table_name, query, k, search_param)) {
         return {};
     }
 
@@ -201,8 +215,14 @@ std::vector<VectorStore::Data> Engine::Search(std::string table_name, const Vect
 
 std::vector<bool> Engine::BatchInsert(std::string table_name, const std::vector<std::tuple<Id, Vector, std::string>> vectors) {
     std::shared_lock lock(engine_mutex_);
-    if (!metadata_.primary || shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_manager_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
+    if (!metadata_.primary || shutdown_ || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_manager_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
         return std::vector<bool>(vectors.size(), false);
+    }
+
+    for (const auto& [id, vector, content] : vectors) {
+        if (!input_validator_->ValidateInsert(table_name, id, vector, content)) {
+            return std::vector<bool>(vectors.size(), false);
+        }
     }
 
     std::vector<bool> success_flags;
@@ -223,8 +243,14 @@ std::vector<bool> Engine::BatchInsert(std::string table_name, const std::vector<
 
 std::vector<bool> Engine::BatchRemove(std::string table_name, std::vector<Id> ids) {
     std::shared_lock lock(engine_mutex_);
-    if (!metadata_.primary || shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_manager_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
+    if (!metadata_.primary || shutdown_ || (!store_map_.contains(table_name) || !persistence_manager_map_.contains(table_name) || !stats_manager_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
         return std::vector<bool>(ids.size(), false);
+    }
+
+    for (auto id : ids) {
+        if (!input_validator_->ValidateRemove(table_name, id)) {
+            return std::vector<bool>(ids.size(), false);
+        }
     }
 
     std::vector<bool> success_flags;
@@ -247,8 +273,14 @@ std::vector<bool> Engine::BatchRemove(std::string table_name, std::vector<Id> id
 
 std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string table_name, const std::vector<std::tuple<Vector, std::size_t, std::size_t>>& requests) {
     std::shared_lock lock(engine_mutex_);
-    if (shutdown_ || table_name.empty() || (!store_map_.contains(table_name) || !metrics_manager_map_.contains(table_name)) || !cache_map_.contains(table_name)) {
+    if (shutdown_ || (!store_map_.contains(table_name) || !metrics_manager_map_.contains(table_name)) || !cache_map_.contains(table_name)) {
         return {};
+    }
+
+    for (const auto& [query, k, search_param] : requests) {
+        if (!input_validator_->ValidateSearch(table_name, query, k, search_param)) {
+            return {};
+        }
     }
 
     auto hash_key = [&](){
@@ -324,7 +356,11 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
 
 StatsManager::Stats Engine::GetStats(std::string table_name) {
     std::shared_lock lock(engine_mutex_);
-    if (shutdown_ || table_name.empty() || !stats_manager_map_.contains(table_name)) {
+    if (shutdown_ || !stats_manager_map_.contains(table_name)) {
+        return {};
+    }
+
+    if (!input_validator_->ValidateStats(table_name)) {
         return {};
     }
 
@@ -333,7 +369,11 @@ StatsManager::Stats Engine::GetStats(std::string table_name) {
 
 MetricsManager::Metrics Engine::GetMetrics(std::string table_name) {
     std::shared_lock lock(engine_mutex_);
-    if (shutdown_ || table_name.empty() || !metrics_manager_map_.contains(table_name)) {
+    if (shutdown_ || !metrics_manager_map_.contains(table_name)) {
+        return {};
+    }
+
+    if (!input_validator_->ValidateMetrics(table_name)) {
         return {};
     }
 
@@ -342,7 +382,11 @@ MetricsManager::Metrics Engine::GetMetrics(std::string table_name) {
 
 bool Engine::CreateTable(std::string name, int vector_dimensionality, const HNSWIndex::HNSWIndexConfig& hnsw_index_config, const FlatIndex::FlatIndexConfig& flat_index_config, std::size_t cache_size) {
     std::unique_lock lock(engine_mutex_);
-    if (!metadata_.primary || shutdown_ || name.empty()) {
+    if (!metadata_.primary || shutdown_) {
+        return false;
+    }
+
+    if (!input_validator_->ValidateCreateTable(name, vector_dimensionality, hnsw_index_config, flat_index_config, cache_size)) {
         return false;
     }
 
@@ -434,8 +478,12 @@ bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, c
 
 bool Engine::DropTable(std::string name) {
     std::unique_lock lock(engine_mutex_);
-    if (!metadata_.primary || shutdown_ || name.empty()) {
+    if (!metadata_.primary || shutdown_) {
         return false;
+    }
+
+    if (!input_validator_->ValidateDropTable(name)) {
+        return {};
     }
 
     if (!store_map_.contains(name) || !persistence_manager_map_.contains(name) || !stats_manager_map_.contains(name) || !metrics_manager_map_.contains(name) || !cache_map_.contains(name)) {

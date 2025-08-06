@@ -15,6 +15,7 @@
 #include "cleaner.h"
 #include "flat_index.h"
 #include "hnsw_index.h"
+#include "input_validator.h"
 #include "logger.h"
 #include "lru_cache.h"
 #include "metrics_manager.h"
@@ -79,6 +80,7 @@ private:
     std::mutex replica_mutex_;
 
     std::unique_ptr<ThreadPool> thread_pool_;
+    std::unique_ptr<InputValidator> input_validator_;
     std::unique_ptr<Logger> logger_;
     std::unique_ptr<ReplicaManager> replica_manager_;
     std::unique_ptr<Cleaner> cleaner_;
