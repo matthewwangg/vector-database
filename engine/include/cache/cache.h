@@ -25,6 +25,7 @@ public:
 
     virtual std::optional<CacheEntry> Get(const CacheKey& key) = 0;
     virtual void Invalidate(const CacheKey& key) = 0;
+    virtual void InvalidateAll() = 0;
     virtual void Store(const CacheKey& key, const CacheEntry& entry) = 0;
 
     virtual ~Cache() = default;

@@ -17,6 +17,7 @@ public:
 
     std::optional<CacheEntry> Get(const CacheKey& key) override;
     void Invalidate(const CacheKey& key) override;
+    void InvalidateAll() override;
     void Store(const CacheKey& key, const CacheEntry& entry) override;
 
     std::size_t GetMaxCacheSize() const { return max_cache_size_; }

@@ -34,6 +34,13 @@ void LRUCache::Invalidate(const CacheKey& key) {
     cache_.erase(key);
 }
 
+void LRUCache::InvalidateAll() {
+    std::unique_lock lock(cache_mutex_);
+
+    cache_.clear();
+    keys_.clear();
+}
+
 void LRUCache::Store(const CacheKey& key, const CacheEntry& entry) {
     std::unique_lock lock(cache_mutex_);
     if (auto it = cache_.find(key); it != cache_.end()) {

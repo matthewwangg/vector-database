@@ -167,6 +167,11 @@ bool Engine::Insert(std::string table_name, Id id, const Vector& vector, const s
         stats_manager_map_[table_name]->Increment(StatsManager::StatType::VECTOR);
         metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::INSERT, 1);
     }
+
+    if (metadata_.use_cache && cache_map_.contains(table_name) && modified_) {
+        cache_map_[table_name]->InvalidateAll();
+    }
+
     return ok;
 }
 
@@ -190,6 +195,11 @@ bool Engine::Remove(std::string table_name, Id id) {
         stats_manager_map_[table_name]->Increment(StatsManager::StatType::STALE);
         metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::REMOVE, 1);
     }
+
+    if (metadata_.use_cache && cache_map_.contains(table_name) && modified_) {
+        cache_map_[table_name]->InvalidateAll();
+    }
+
     return ok;
 }
 
@@ -238,6 +248,11 @@ std::vector<bool> Engine::BatchInsert(std::string table_name, const std::vector<
         }
         success_flags.push_back(ok);
     }
+
+    if (metadata_.use_cache && cache_map_.contains(table_name) && modified_) {
+        cache_map_[table_name]->InvalidateAll();
+    }
+
     return success_flags;
 }
 
@@ -268,6 +283,11 @@ std::vector<bool> Engine::BatchRemove(std::string table_name, std::vector<Id> id
         }
         success_flags.push_back(ok);
     }
+
+    if (metadata_.use_cache && cache_map_.contains(table_name) && modified_) {
+        cache_map_[table_name]->InvalidateAll();
+    }
+
     return success_flags;
 }
 
