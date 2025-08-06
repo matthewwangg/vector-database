@@ -13,6 +13,7 @@ add_library(engine
         src/replica/replica_manager.cc
         src/cleaner/cleaner.cc
         src/index/flat_index.cc
+        src/util/input_validator.cc
         proto/storage.pb.cc
         proto/replica.pb.cc
         proto/replica.grpc.pb.cc
