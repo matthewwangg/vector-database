@@ -15,6 +15,8 @@ using Vector = std::vector<float>;
 
 class InputValidator {
 public:
+    explicit InputValidator() = default;
+
     bool ValidateInsert(std::string table_name, Id id, const Vector& vector, const std::string& content);
     bool ValidateRemove(std::string table_name, Id id);
     bool ValidateSearch(std::string table_name, const Vector& query, std::size_t k, std::size_t search_param);
