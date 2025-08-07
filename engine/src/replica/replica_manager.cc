@@ -41,12 +41,10 @@ ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_
 }
 
 ReplicaManager::~ReplicaManager() {
-    if (primary_) {
-        {
-            std::unique_lock<std::mutex> lock(sync_mutex_);
-        }
-        sync_cv_.notify_one();
+    {
+        std::unique_lock<std::mutex> lock(sync_mutex_);
     }
+    sync_cv_.notify_one();
     if (sync_thread_.joinable()) {
         sync_thread_.join();
     }
@@ -68,9 +66,10 @@ void ReplicaManager::RunReplicaServer() {
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
     std::thread shutdown_thread([&server, this]() {
-        while (!shutdown_) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(kShutdownCheckInterval));
-        }
+        std::unique_lock<std::mutex> lock(sync_mutex_);
+        sync_cv_.wait(lock, [this]() {
+            return shutdown_.load();
+        });
         logger_->Info("replica sync server shutting down...", name_);
         server->Shutdown();
     });
