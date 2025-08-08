@@ -19,6 +19,7 @@
 #include "logger.h"
 #include "metrics_manager.h"
 #include "remote_logger.h"
+#include "silent_logger.h"
 #include "stats_manager.h"
 #include "thread_pool.h"
 #include "vector_store.h"

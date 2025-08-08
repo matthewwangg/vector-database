@@ -14,6 +14,7 @@ add_library(engine
         src/cleaner/cleaner.cc
         src/index/flat_index.cc
         src/util/input_validator.cc
+        src/logger/silent_logger.cc
         proto/storage.pb.cc
         proto/replica.pb.cc
         proto/replica.grpc.pb.cc
