@@ -12,7 +12,9 @@ message SyncRequest {
   repeated WALEntry entry = 1;
 }
 
-message SyncResponse {}
+message SyncResponse {
+  uint64 successful_count = 1;
+}
 
 message WALEntry {
   enum Type {

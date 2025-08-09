@@ -61,7 +61,7 @@ public:
     std::vector<std::string> ListTables();
 
     void Cleanup(const std::string& table_name, bool force);
-    void ApplyWALEntry(const vector_db::WALEntry& entry);
+    bool ApplyWALEntry(const vector_db::WALEntry& entry);
 
     Logger* GetLogger() const;
 

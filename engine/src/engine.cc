@@ -74,7 +74,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
 
     replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, shutdown_, modified_,
     [this](const vector_db::WALEntry& entry) {
-        this->ApplyWALEntry(entry);
+        return this->ApplyWALEntry(entry);
     },
     [this]() -> const auto& {
         return this->persistence_manager_map_;
@@ -586,7 +586,7 @@ void Engine::Cleanup(const std::string& table_name, bool force) {
     }
 }
 
-void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
+bool Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
     if (entry.type() == vector_db::WALEntry::CREATE) {
         const auto& config = entry.create_config();
         const auto& store_config = config.store_config();
@@ -603,6 +603,7 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
             std::unique_lock replica_lock(replica_mutex_);
             ok = CreateTableOnReplica(entry.table(), store_config.vector_dimensionality(), hnsw_index_config, flat_index_config, cache_config.cache_size());
         }
+        return ok;
     }
     if (entry.type() == vector_db::WALEntry::DROP) {
         const auto& config = entry.drop_config();
@@ -613,12 +614,13 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
             std::unique_lock replica_lock(replica_mutex_);
             ok = DropTableOnReplica(entry.table());
         }
+        return ok;
     }
 
     std::unique_lock replica_lock(replica_mutex_);
     std::unique_lock lock(engine_mutex_);
     if (!store_map_.contains(entry.table()) || !stats_manager_map_.contains(entry.table())) {
-        return;
+        return false;
     }
     if (entry.type() == vector_db::WALEntry::INSERT) {
         const auto& config = entry.insert_config();
@@ -627,6 +629,7 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
         if (ok) {
             stats_manager_map_[entry.table()]->Increment(StatsManager::StatType::VECTOR);
         }
+        return ok;
     }
     if (entry.type() == vector_db::WALEntry::REMOVE) {
         const auto& config = entry.remove_config();
@@ -636,7 +639,10 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
             stats_manager_map_[entry.table()]->Increment(StatsManager::StatType::DELETED);
             stats_manager_map_[entry.table()]->Increment(StatsManager::StatType::STALE);
         }
+        return ok;
     }
+
+    return false;
 }
 
 Logger* Engine::GetLogger() const {

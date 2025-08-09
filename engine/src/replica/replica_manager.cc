@@ -22,7 +22,7 @@ constexpr int kSyncInterval = 90;
 constexpr int kShutdownCheckInterval = 1000;
 constexpr int kRetryCount = 3;
 
-ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, std::atomic<bool>& modified, const std::function<void(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, Logger* logger)
+ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, std::atomic<bool>& modified, const std::function<bool(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, Logger* logger)
     : name_(name),
       primary_(primary),
       sync_server_address_(sync_server_address),
@@ -103,39 +103,44 @@ void ReplicaManager::Sync(bool force) {
         return;
     }
 
+    bool failed = false;
+
     const auto& persistence_manager_map = get_persistence_manager_map_callback_();
     for (const auto& [table, persistence_manager] : persistence_manager_map) {
-        vector_db::SyncRequest request;
-        std::vector<vector_db::WALEntry> entries = persistence_manager->SerializeWALEntries(wal_offsets_map_[table]);
-        if (entries.empty()) {
-            continue;
-        }
-
-        for (const auto& entry : entries) {
-            *request.add_entry() = entry;
-        }
-
         for (const auto& replica : replicas_) {
             for (int i = 0; i < kRetryCount; ++i) {
+                vector_db::SyncRequest request;
+                std::vector<vector_db::WALEntry> entries = persistence_manager->SerializeWALEntries(wal_offsets_per_replica_map_[table][replica]);
+                if (entries.empty()) {
+                    continue;
+                }
+
+                for (const auto& entry : entries) {
+                    *request.add_entry() = entry;
+                }
+
                 auto stub = vector_db::ReplicaManager::NewStub(grpc::CreateChannel(replica, grpc::InsecureChannelCredentials()));
                 vector_db::SyncResponse response;
                 grpc::ClientContext context;
                 grpc::Status status = stub->Sync(&context, request, &response);
-                if (status.ok()) {
+                wal_offsets_per_replica_map_[table][replica] = wal_offsets_per_replica_map_[table][replica] + response.successful_count();
+                if (status.ok() && response.successful_count() == entries.size()) {
                     break;
                 } else {
+                    failed = true;
                     logger_->Error("error in updating replica: " + replica, name_);
                 }
             }
         }
-
-        wal_offsets_map_[table] += entries.size();
     }
-    modified_ = false;
+
+    if (!failed) {
+        modified_ = false;
+    }
 }
 
-void ReplicaManager::ApplyWALEntry(const vector_db::WALEntry& entry) {
-    apply_callback_(entry);
+bool ReplicaManager::ApplyWALEntry(const vector_db::WALEntry& entry) {
+    return apply_callback_(entry);
 }
 
 } // namespace vector_db_engine
