@@ -380,7 +380,6 @@ void VectorPersistenceManager::ReplayWAL(const std::function<void(const vector_d
             Id id;
             stream >> id;
             entry.mutable_remove_config()->set_id(id);
-            callback(entry);
         }
         if (command == "create") {
             entry.set_type(vector_db::WALEntry::CREATE);

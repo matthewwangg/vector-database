@@ -294,7 +294,7 @@ std::vector<bool> Engine::BatchRemove(std::string table_name, std::vector<Id> id
 
 std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string table_name, const std::vector<std::tuple<Vector, std::size_t, std::size_t>>& requests) {
     std::shared_lock lock(engine_mutex_);
-    if (shutdown_ || (!store_map_.contains(table_name) || !metrics_manager_map_.contains(table_name)) || !cache_map_.contains(table_name)) {
+    if (shutdown_ || (!store_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
         return {};
     }
 
@@ -317,6 +317,9 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
     }();
 
     if (metadata_.use_cache) {
+        if (!cache_map_.contains(table_name)) {
+            return {};
+        }
         std::optional<Cache::CacheEntry> cache_entry = cache_map_[table_name]->Get(hash_key);
         if (cache_entry.has_value()) {
             metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::CACHE_HIT, 1);
@@ -557,8 +560,8 @@ std::vector<std::string> Engine::ListTables() {
 }
 
 void Engine::Cleanup(const std::string& table_name, bool force) {
-    std::unique_lock lock(engine_mutex_);
     std::unique_lock replica_lock(replica_mutex_);
+    std::unique_lock lock(engine_mutex_);
     if ((shutdown_ && !force) || (!store_map_.contains(table_name)|| !stats_manager_map_.contains(table_name) || !metrics_manager_map_.contains(table_name))) {
         return;
     }
@@ -592,26 +595,27 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
         const auto& cache_config = config.cache_config();
 
         bool ok = false;
-        std::unique_lock replica_lock(replica_mutex_);
         HNSWIndex::HNSWIndexConfig hnsw_index_config = {hnsw_config.m(), hnsw_config.m0(), hnsw_config.ef_construction(), hnsw_config.ml(), (hnsw_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine), hnsw_config.vector_dimensionality()};
         FlatIndex::FlatIndexConfig flat_index_config = {flat_config.vector_dimensionality(), (flat_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine)};
         if (metadata_.primary) {
             ok = CreateTable(entry.table(), store_config.vector_dimensionality(), hnsw_index_config, flat_index_config, cache_config.cache_size());
         } else {
+            std::unique_lock replica_lock(replica_mutex_);
             ok = CreateTableOnReplica(entry.table(), store_config.vector_dimensionality(), hnsw_index_config, flat_index_config, cache_config.cache_size());
         }
     }
     if (entry.type() == vector_db::WALEntry::DROP) {
         const auto& config = entry.drop_config();
         bool ok = false;
-        std::unique_lock replica_lock(replica_mutex_);
         if (metadata_.primary) {
             ok = DropTable(entry.table());
         } else {
+            std::unique_lock replica_lock(replica_mutex_);
             ok = DropTableOnReplica(entry.table());
         }
     }
 
+    std::unique_lock replica_lock(replica_mutex_);
     std::unique_lock lock(engine_mutex_);
     if (!store_map_.contains(entry.table()) || !stats_manager_map_.contains(entry.table())) {
         return;
@@ -619,7 +623,6 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
     if (entry.type() == vector_db::WALEntry::INSERT) {
         const auto& config = entry.insert_config();
         Vector vector(config.vector().begin(), config.vector().end());
-        std::unique_lock replica_lock(replica_mutex_);
         bool ok = store_map_[entry.table()]->Insert(config.id(), vector, config.content());
         if (ok) {
             stats_manager_map_[entry.table()]->Increment(StatsManager::StatType::VECTOR);
@@ -627,7 +630,6 @@ void Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
     }
     if (entry.type() == vector_db::WALEntry::REMOVE) {
         const auto& config = entry.remove_config();
-        std::unique_lock replica_lock(replica_mutex_);
         bool ok = store_map_[entry.table()]->Remove(config.id());
         if (ok) {
             stats_manager_map_[entry.table()]->SetRemovedFlag(true);

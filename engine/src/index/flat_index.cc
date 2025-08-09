@@ -48,7 +48,6 @@ std::vector<Id> FlatIndex::Search(const Vector& query, std::size_t k, std::size_
         float distance = ComputeDistance(query, vector);
         top_k.emplace(distance, id);
 
-        auto [kth_distance, kth_vector] = top_k.top();
         if (top_k.size() > k) {
             top_k.pop();
         }
