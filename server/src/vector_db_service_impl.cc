@@ -155,8 +155,8 @@ grpc::Status VectorDatabaseServiceImpl::CreateTable(grpc::ServerContext* context
     int vector_dimensionality = request->store_config().vector_dimensionality();
     std::size_t cache_size = request->cache_config().cache_size();
 
-    vector_db_engine::HNSWIndex::HNSWIndexConfig hnsw_index_config;
-    vector_db_engine::FlatIndex::FlatIndexConfig flat_index_config;
+    vector_db_engine::HNSWIndex::HNSWIndexConfig hnsw_index_config{};
+    vector_db_engine::FlatIndex::FlatIndexConfig flat_index_config{};
     if (request->has_hnsw_index_config()) {
         std::size_t m = request->hnsw_index_config().m();
         std::size_t m0 = request->hnsw_index_config().m0();
