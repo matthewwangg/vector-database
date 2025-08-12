@@ -37,6 +37,8 @@ public:
 
     void Cleanup(bool reindex);
 
+    std::uint64_t ComputeChecksum();
+
     const std::unordered_map<Id, Data>& GetStore() const { return store_; }
     const VectorIndex* GetIndex() const { return index_.get(); }
     IndexType GetIndexType() const { return index_type_; }

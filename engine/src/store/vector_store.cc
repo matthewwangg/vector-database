@@ -77,4 +77,25 @@ void VectorStore::Cleanup(bool reindex) {
     }
 }
 
+std::uint64_t VectorStore::Checksum() {
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+
+    std::uint64_t checksum = 0;
+    for (const auto& [id, data] : store_) {
+        checksum = checksum * 71 + id;
+
+        for (float value : data.vector) {
+            uint64_t bits;
+            std::memcpy(&bits, &value, sizeof(value));
+            checksum = checksum * 71 + bits;
+        }
+
+        for (unsigned char c : data.content) {
+            checksum = checksum * 71 + c;
+        }
+    }
+
+    return checksum;
+}
+
 } // namespace vector_db_engine
