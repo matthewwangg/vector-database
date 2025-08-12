@@ -137,8 +137,6 @@ void ReplicaManager::Sync(bool force) {
                     vector_db::GetChecksumResponse checksum_response;
                     grpc::ClientContext checksum_context;
                     grpc::Status checksum_status = stub->GetChecksum(&checksum_context, checksum_request, &checksum_response);
-                    std::cout << checksum << std::endl;
-                    std::cout << checksum_response.checksum() << std::endl;
                     if (status.ok() && checksum == checksum_response.checksum()) {
                         break;
                     }

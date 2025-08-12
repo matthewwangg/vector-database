@@ -1,5 +1,6 @@
 #include "vector_store.h"
 
+#include <algorithm>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -82,14 +83,16 @@ std::uint64_t VectorStore::ComputeChecksum() {
     std::shared_lock<std::shared_mutex> lock(rw_mutex_);
 
     std::uint64_t checksum = 0;
-    for (const auto& [id, data] : store_) {
-        checksum = checksum * 71 + id;
 
-        for (float value : data.vector) {
-            uint64_t bits;
-            std::memcpy(&bits, &value, sizeof(value));
-            checksum = checksum * 71 + bits;
-        }
+    std::vector<Id> ids;
+    for (const auto& [id, data] : store_) {
+        ids.push_back(id);
+    }
+    std::sort(ids.begin(), ids.end());
+
+    for (const Id& id : ids) {
+        const Data& data = store_.at(id);
+        checksum = checksum * 71 + id;
 
         for (unsigned char c : data.content) {
             checksum = checksum * 71 + c;
