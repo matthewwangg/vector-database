@@ -16,6 +16,7 @@ public:
     explicit ReplicaManagerServiceImpl(ReplicaManager* replica_manager);
 
     grpc::Status Sync(grpc::ServerContext* context, const vector_db::SyncRequest* request, vector_db::SyncResponse* response) override;
+    grpc::Status GetChecksum(grpc::ServerContext* context, const vector_db::GetChecksumRequest* request, vector_db::GetChecksumResponse* response) override;
 
 private:
     ReplicaManager* replica_manager_;

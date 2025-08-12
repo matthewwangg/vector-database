@@ -1,5 +1,7 @@
 #include "vector_store.h"
 
+#include <algorithm>
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -75,6 +77,29 @@ void VectorStore::Cleanup(bool reindex) {
     if (reindex) {
         index_->Reindex();
     }
+}
+
+std::uint64_t VectorStore::ComputeChecksum() {
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+
+    std::uint64_t checksum = 0;
+
+    std::vector<Id> ids;
+    for (const auto& [id, data] : store_) {
+        ids.push_back(id);
+    }
+    std::sort(ids.begin(), ids.end());
+
+    for (const Id& id : ids) {
+        const Data& data = store_.at(id);
+        checksum = checksum * 71 + id;
+
+        for (unsigned char c : data.content) {
+            checksum = checksum * 71 + c;
+        }
+    }
+
+    return checksum;
 }
 
 } // namespace vector_db_engine

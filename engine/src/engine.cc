@@ -79,6 +79,9 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     [this]() -> const auto& {
         return this->persistence_manager_map_;
     },
+    [this]() -> const auto& {
+        return this->store_map_;
+    },
     logger_.get());
     cleaner_ = std::make_unique<Cleaner>(metadata_.name, shutdown_,
     [this](const std::string& table_name, bool force) {
