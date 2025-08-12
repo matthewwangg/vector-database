@@ -23,4 +23,10 @@ grpc::Status ReplicaManagerServiceImpl::Sync(grpc::ServerContext* context, const
     return grpc::Status::OK;
 }
 
+grpc::Status ReplicaManagerServiceImpl::GetChecksum(grpc::ServerContext* context, const vector_db::GetChecksumRequest* request, vector_db::GetChecksumResponse* response) {
+    std::uint64_t checksum = replica_manager_->GetChecksum(request->table());
+    response->set_checksum(checksum);
+    return grpc::Status::OK;
+}
+
 } // namespace vector_db_engine

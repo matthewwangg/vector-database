@@ -31,6 +31,8 @@ public:
 
     bool ApplyWALEntry(const vector_db::WALEntry& entry);
 
+    std::uint64_t GetChecksum(std::string table);
+
 private:
     std::string name_;
     std::atomic<bool>& shutdown_;
