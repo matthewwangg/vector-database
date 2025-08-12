@@ -1,5 +1,6 @@
 #include "vector_store.h"
 
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -77,7 +78,7 @@ void VectorStore::Cleanup(bool reindex) {
     }
 }
 
-std::uint64_t VectorStore::Checksum() {
+std::uint64_t VectorStore::ComputeChecksum() {
     std::shared_lock<std::shared_mutex> lock(rw_mutex_);
 
     std::uint64_t checksum = 0;

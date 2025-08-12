@@ -12,6 +12,7 @@
 #include <grpcpp/grpcpp.h>
 
 #include "persistence_manager.h"
+#include "vector_store.h"
 
 #include "replica_manager_service_impl.h"
 #include "replica.pb.h"
@@ -22,7 +23,7 @@ constexpr int kSyncInterval = 90;
 constexpr int kShutdownCheckInterval = 1000;
 constexpr int kRetryCount = 3;
 
-ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, std::atomic<bool>& modified, const std::function<bool(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, Logger* logger)
+ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, std::atomic<bool>& modified, const std::function<bool(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()> get_vector_store_map_callback, Logger* logger)
     : name_(name),
       primary_(primary),
       sync_server_address_(sync_server_address),
@@ -31,6 +32,7 @@ ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_
       modified_(modified),
       apply_callback_(apply_callback),
       get_persistence_manager_map_callback_(get_persistence_manager_map_callback),
+      get_vector_store_map_callback_(get_vector_store_map_callback),
       logger_(logger)
 {
     if (primary_ && !replicas_.empty()) {
@@ -106,7 +108,11 @@ void ReplicaManager::Sync(bool force) {
     bool failed = false;
 
     const auto& persistence_manager_map = get_persistence_manager_map_callback_();
+    const auto& vector_store_map = get_vector_store_map_callback_();
     for (const auto& [table, persistence_manager] : persistence_manager_map) {
+        if (!vector_store_map.contains(table)) {
+            continue;
+        }
         for (const auto& replica : replicas_) {
             for (int i = 0; i < kRetryCount; ++i) {
                 vector_db::SyncRequest request;
@@ -114,6 +120,7 @@ void ReplicaManager::Sync(bool force) {
                 if (entries.empty()) {
                     continue;
                 }
+                std::uint64_t checksum = vector_store_map.at(table)->ComputeChecksum();
 
                 for (const auto& entry : entries) {
                     *request.add_entry() = entry;
