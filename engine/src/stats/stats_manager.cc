@@ -6,12 +6,17 @@
 namespace vector_db_engine {
 
 StatsManager::StatsManager()
-    : removed_(false)
+    : modified_(false),
+      removed_(false)
 {}
 
 StatsManager::Stats StatsManager::GetStats() const {
     std::shared_lock lock(stats_mutex_);
     return stats_;
+}
+
+bool StatsManager::GetModifiedFlag() const {
+    return modified_;
 }
 
 bool StatsManager::GetRemovedFlag() const {
@@ -70,6 +75,10 @@ void StatsManager::AdjustForDeletions() {
 
 void StatsManager::SetRemovedFlag(bool value) {
     removed_ = value;
+}
+
+void StatsManager::SetModifiedFlag(bool value) {
+    modified_ = value;
 }
 
 } // namespace vector_db_engine

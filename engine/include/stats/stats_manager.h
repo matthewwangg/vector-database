@@ -24,6 +24,7 @@ public:
     StatsManager();
 
     Stats GetStats() const;
+    bool GetModifiedFlag() const;
     bool GetRemovedFlag() const;
 
     void Increment(StatType stat_type);
@@ -31,10 +32,13 @@ public:
     void Set(StatType stat_type, int value);
     void AdjustForDeletions();
 
+    void SetModifiedFlag(bool value);
     void SetRemovedFlag(bool value);
 
 private:
     Stats stats_;
+
+    std::atomic<bool> modified_;
     std::atomic<bool> removed_;
 
     mutable std::shared_mutex stats_mutex_;

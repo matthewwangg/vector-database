@@ -39,8 +39,7 @@ inline const std::string kWriteAheadLogFilename = "wal.log";
 inline const std::string kMetadataFilename = "metadata.bin";
 
 Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string sync_server_address, std::vector<std::string> replicas)
-    : shutdown_(false),
-      modified_(false)
+    : shutdown_(false)
 {
     metadata_ = Metadata{
         .name = name,
@@ -72,12 +71,15 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     input_validator_ = std::make_unique<InputValidator>();
     logger_ = std::make_unique<LocalLogger>();
 
-    replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, shutdown_, modified_,
+    replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, shutdown_,
     [this](const vector_db::WALEntry& entry) {
         return this->ApplyWALEntry(entry);
     },
     [this]() -> const auto& {
         return this->persistence_manager_map_;
+    },
+    [this]() -> const auto& {
+        return this->stats_manager_map_;
     },
     [this]() -> const auto& {
         return this->store_map_;
@@ -167,12 +169,12 @@ bool Engine::Insert(std::string table_name, Id id, const Vector& vector, const s
 
     bool ok = store_map_[table_name]->Insert(id, vector, content);
     if (ok) {
-        modified_ = true;
+        stats_manager_map_[table_name]->SetModifiedFlag(true);
         stats_manager_map_[table_name]->Increment(StatsManager::StatType::VECTOR);
         metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::INSERT, 1);
     }
 
-    if (metadata_.use_cache && cache_map_.contains(table_name) && modified_) {
+    if (metadata_.use_cache && cache_map_.contains(table_name) && stats_manager_map_[table_name]->GetModifiedFlag()) {
         cache_map_[table_name]->InvalidateAll();
     }
 
@@ -193,14 +195,14 @@ bool Engine::Remove(std::string table_name, Id id) {
 
     bool ok = store_map_[table_name]->Remove(id);
     if (ok) {
-        modified_ = true;
+        stats_manager_map_[table_name]->SetModifiedFlag(true);
         stats_manager_map_[table_name]->SetRemovedFlag(true);
         stats_manager_map_[table_name]->Increment(StatsManager::StatType::DELETED);
         stats_manager_map_[table_name]->Increment(StatsManager::StatType::STALE);
         metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::REMOVE, 1);
     }
 
-    if (metadata_.use_cache && cache_map_.contains(table_name) && modified_) {
+    if (metadata_.use_cache && cache_map_.contains(table_name) && stats_manager_map_[table_name]->GetModifiedFlag()) {
         cache_map_[table_name]->InvalidateAll();
     }
 
@@ -246,14 +248,14 @@ std::vector<bool> Engine::BatchInsert(std::string table_name, const std::vector<
 
         bool ok = store_map_[table_name]->Insert(id, vector, content);
         if (ok) {
-            modified_ = true;
+            stats_manager_map_[table_name]->SetModifiedFlag(true);
             stats_manager_map_[table_name]->Increment(StatsManager::StatType::VECTOR);
             metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::INSERT, 1);
         }
         success_flags.push_back(ok);
     }
 
-    if (metadata_.use_cache && cache_map_.contains(table_name) && modified_) {
+    if (metadata_.use_cache && cache_map_.contains(table_name) && stats_manager_map_[table_name]->GetModifiedFlag()) {
         cache_map_[table_name]->InvalidateAll();
     }
 
@@ -279,7 +281,7 @@ std::vector<bool> Engine::BatchRemove(std::string table_name, std::vector<Id> id
 
         bool ok = store_map_[table_name]->Remove(id);
         if (ok) {
-            modified_ = true;
+            stats_manager_map_[table_name]->SetModifiedFlag(true);
             stats_manager_map_[table_name]->SetRemovedFlag(true);
             stats_manager_map_[table_name]->Increment(StatsManager::StatType::DELETED);
             stats_manager_map_[table_name]->Increment(StatsManager::StatType::STALE);
@@ -288,7 +290,7 @@ std::vector<bool> Engine::BatchRemove(std::string table_name, std::vector<Id> id
         success_flags.push_back(ok);
     }
 
-    if (metadata_.use_cache && cache_map_.contains(table_name) && modified_) {
+    if (metadata_.use_cache && cache_map_.contains(table_name) && stats_manager_map_[table_name]->GetModifiedFlag()) {
         cache_map_[table_name]->InvalidateAll();
     }
 
@@ -456,7 +458,7 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, const HNSW
     metrics_manager_map_[name] = std::move(metrics_manager);
     cache_map_[name] = std::move(lru_cache);
 
-    modified_ = true;
+    stats_manager_map_[name]->SetModifiedFlag(true);
 
     return true;
 }
@@ -517,7 +519,7 @@ bool Engine::DropTable(std::string name) {
         return false;
     }
 
-    modified_ = true;
+    stats_manager_map_[name]->SetModifiedFlag(true);
 
     persistence_manager_map_[name]->AppendDrop();
     replica_manager_->Sync(true);

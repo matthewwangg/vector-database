@@ -12,6 +12,7 @@
 #include <grpcpp/grpcpp.h>
 
 #include "persistence_manager.h"
+#include "stats_manager.h"
 #include "vector_store.h"
 
 #include "replica_manager_service_impl.h"
@@ -23,15 +24,15 @@ constexpr int kSyncInterval = 90;
 constexpr int kShutdownCheckInterval = 1000;
 constexpr int kRetryCount = 3;
 
-ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, std::atomic<bool>& modified, const std::function<bool(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()> get_vector_store_map_callback, Logger* logger)
+ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, const std::function<bool(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()> get_stats_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()> get_vector_store_map_callback, Logger* logger)
     : name_(name),
       primary_(primary),
       sync_server_address_(sync_server_address),
       replicas_(replicas),
       shutdown_(shutdown),
-      modified_(modified),
       apply_callback_(apply_callback),
       get_persistence_manager_map_callback_(get_persistence_manager_map_callback),
+      get_stats_manager_map_callback_(get_stats_manager_map_callback),
       get_vector_store_map_callback_(get_vector_store_map_callback),
       logger_(logger)
 {
@@ -88,7 +89,15 @@ void ReplicaManager::RunReplicaSyncLoop() {
             break;
         }
 
-        if (!modified_) {
+        bool modified = false;
+        const auto& stats_manager_map = get_stats_manager_map_callback_();
+        for (const auto& [table, stats_manager] : stats_manager_map) {
+            if (stats_manager->GetModifiedFlag() == true) {
+                modified = true;
+                break;
+            }
+        }
+        if (!modified) {
             continue;
         }
 
@@ -105,11 +114,12 @@ void ReplicaManager::Sync(bool force) {
         return;
     }
 
-    bool failed = false;
 
     const auto& persistence_manager_map = get_persistence_manager_map_callback_();
     const auto& vector_store_map = get_vector_store_map_callback_();
+    const auto& stats_manager_map = get_stats_manager_map_callback_();
     for (const auto& [table, persistence_manager] : persistence_manager_map) {
+        bool failed = false;
         if (!vector_store_map.contains(table)) {
             continue;
         }
@@ -148,10 +158,12 @@ void ReplicaManager::Sync(bool force) {
                 }
             }
         }
-    }
-
-    if (!failed) {
-        modified_ = false;
+        if (!failed) {
+            if (!stats_manager_map.contains(table)) {
+                continue;
+            }
+            stats_manager_map.at(table)->SetModifiedFlag(false);
+        }
     }
 }
 
