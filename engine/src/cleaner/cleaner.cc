@@ -38,12 +38,6 @@ Cleaner::~Cleaner() {
 void Cleaner::BackgroundCleanupLoop() {
     std::unique_lock<std::mutex> lock(cleanup_mutex_);
     while (!shutdown_) {
-        cleanup_cv_.wait_for(lock, std::chrono::seconds(kCleanupInterval));
-
-        if (shutdown_) {
-            break;
-        }
-
         const auto& store_map = get_store_map_callback_();
         const auto& stats_manager_map = get_stats_manager_map_callback_();
         for (auto& [table, store] : store_map) {
@@ -54,6 +48,11 @@ void Cleaner::BackgroundCleanupLoop() {
                 auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
                 logger_->Info("cleanup completed in " + std::to_string(duration_ms) + " ms", name_);
             }
+        }
+
+        cleanup_cv_.wait_for(lock, std::chrono::seconds(kCleanupInterval));
+        if (shutdown_) {
+            break;
         }
     }
 }
