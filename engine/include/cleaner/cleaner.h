@@ -18,13 +18,14 @@ class Engine;
 
 class Cleaner {
 public:
-    explicit Cleaner(std::string name, std::atomic<bool>& shutdown, const std::function<void(const std::string&, bool)>& cleanup_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()>& get_store_map_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()>& get_stats_manager_map_callback, Logger* logger);
+    explicit Cleaner(std::string name, int cleanup_interval, std::atomic<bool>& shutdown, const std::function<void(const std::string&, bool)>& cleanup_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()>& get_store_map_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()>& get_stats_manager_map_callback, Logger* logger);
     ~Cleaner();
 
     void BackgroundCleanupLoop();
 
 private:
     std::string name_;
+    int cleanup_interval_;
     std::atomic<bool>& shutdown_;
 
     std::function<void(const std::string&, bool)> cleanup_callback_;

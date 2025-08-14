@@ -38,9 +38,11 @@ public:
         std::vector<std::string> replicas;
         float reindex_threshold;
         bool use_cache;
+        int cleanup_interval;
+        int sync_interval;
     };
 
-    explicit Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string primary_address = "", std::vector<std::string> replicas = {});
+    explicit Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string primary_address = "", std::vector<std::string> replicas = {}, int cleanup_interval = 60, int sync_interval = 90);
     ~Engine();
 
     bool Insert(std::string table_name, Id id, const Vector& vector, const std::string& content);

@@ -25,7 +25,7 @@ protected:
         std::string sync_server_address;
         std::vector<std::string> replicas;
 
-        engine_ = std::make_unique<vector_db_engine::Engine>(name, primary, reindex_threshold, use_cache, sync_server_address, replicas);
+        engine_ = std::make_unique<vector_db_engine::Engine>(name, primary, reindex_threshold, use_cache, sync_server_address, replicas, 5, 10);
         engine_->DropTable("test_table");
     }
 

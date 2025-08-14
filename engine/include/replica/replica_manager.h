@@ -22,7 +22,7 @@ namespace vector_db_engine {
 
 class ReplicaManager {
 public:
-    explicit ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, const std::function<bool(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()> get_stats_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()> get_vector_store_map_callback, Logger* logger);
+    explicit ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, int sync_interval, std::atomic<bool>& shutdown, const std::function<bool(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()> get_stats_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()> get_vector_store_map_callback, Logger* logger);
     ~ReplicaManager();
 
     void RunReplicaServer();
@@ -36,6 +36,7 @@ public:
 
 private:
     std::string name_;
+    int sync_interval_;
     std::atomic<bool>& shutdown_;
 
     Logger* logger_;

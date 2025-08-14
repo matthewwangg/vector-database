@@ -63,7 +63,7 @@ TEST_F(CleanerTest, CallbackTriggers) {
     stats_manager_map_["test_table"] = std::move(stats_manager);
 
     {
-        auto cleaner = std::make_unique<Cleaner>("unit-test", shutdown_, cleanup_callback_, get_store_map_callback_, get_stats_manager_map_callback_, logger_.get());
+        auto cleaner = std::make_unique<Cleaner>("unit-test", 2, shutdown_, cleanup_callback_, get_store_map_callback_, get_stats_manager_map_callback_, logger_.get());
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         shutdown_ = true;
     }
@@ -81,7 +81,7 @@ TEST_F(CleanerTest, CallbackDoesNotTrigger) {
     stats_manager_map_["test_table"] = std::move(stats_manager);
 
     {
-        auto cleaner = std::make_unique<Cleaner>("unit-test", shutdown_, cleanup_callback_, get_store_map_callback_, get_stats_manager_map_callback_, logger_.get());
+        auto cleaner = std::make_unique<Cleaner>("unit-test", 2, shutdown_, cleanup_callback_, get_store_map_callback_, get_stats_manager_map_callback_, logger_.get());
         shutdown_ = true;
     }
 

@@ -43,6 +43,8 @@ int main(int argc, char* argv[]) {
     bool primary = true;
     float reindex_threshold = 0.25f;
     bool use_cache = true;
+    int cleanup_interval = 60000;
+    int sync_interval = 90000;
     std::string sync_server_address;
     std::vector<std::string> replicas;
 
@@ -56,13 +58,17 @@ int main(int argc, char* argv[]) {
             replicas.emplace_back(argv[++i]);
         } else if  (arg == "--sync-server-address" && argc > i + 1) {
             sync_server_address = argv[++i];
+        } else if (arg == "--cleanup-interval" && argc > i + 1) {
+            cleanup_interval = std::stoi(argv[++i]);
+        } else if (arg == "--sync-interval" && argc > i + 1) {
+            sync_interval = std::stoi(argv[++i]);
         } else {
             std::cout << "usage: " << argv[0] << " <name> <server-address> [flags]" << std::endl;
             return 1;
         }
     }
 
-    auto engine = std::make_unique<vector_db_engine::Engine>(name, primary, reindex_threshold, use_cache, sync_server_address, replicas);
+    auto engine = std::make_unique<vector_db_engine::Engine>(name, primary, reindex_threshold, use_cache, sync_server_address, replicas, cleanup_interval, sync_interval);
 
     VectorDatabaseServiceImpl vector_db_service(std::move(engine));
 

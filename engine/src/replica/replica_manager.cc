@@ -20,15 +20,15 @@
 
 namespace vector_db_engine {
 
-constexpr int kSyncInterval = 90;
 constexpr int kShutdownCheckInterval = 1000;
 constexpr int kRetryCount = 3;
 
-ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, std::atomic<bool>& shutdown, const std::function<bool(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()> get_stats_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()> get_vector_store_map_callback, Logger* logger)
+ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, int sync_interval, std::atomic<bool>& shutdown, const std::function<bool(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()> get_stats_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()> get_vector_store_map_callback, Logger* logger)
     : name_(name),
       primary_(primary),
       sync_server_address_(sync_server_address),
       replicas_(replicas),
+      sync_interval_(sync_interval),
       shutdown_(shutdown),
       apply_callback_(apply_callback),
       get_persistence_manager_map_callback_(get_persistence_manager_map_callback),
@@ -84,7 +84,7 @@ void ReplicaManager::RunReplicaServer() {
 void ReplicaManager::RunReplicaSyncLoop() {
     std::unique_lock<std::mutex> lock(sync_mutex_);
     while (!shutdown_) {
-        sync_cv_.wait_for(lock, std::chrono::seconds(kSyncInterval));
+        sync_cv_.wait_for(lock, std::chrono::milliseconds(sync_interval_));
         if (shutdown_) {
             break;
         }

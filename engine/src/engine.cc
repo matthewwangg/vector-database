@@ -38,7 +38,7 @@ inline const std::string kIndexSnapshotFilename = "index_snapshot.dat";
 inline const std::string kWriteAheadLogFilename = "wal.log";
 inline const std::string kMetadataFilename = "metadata.bin";
 
-Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string sync_server_address, std::vector<std::string> replicas)
+Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string sync_server_address, std::vector<std::string> replicas, int cleanup_interval, int sync_interval)
     : shutdown_(false)
 {
     metadata_ = Metadata{
@@ -48,6 +48,8 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
         .replicas = replicas,
         .reindex_threshold = reindex_threshold,
         .use_cache = use_cache,
+        .cleanup_interval = cleanup_interval,
+        .sync_interval = sync_interval,
     };
 
     std::vector<std::string> table_names = [&]() {
@@ -71,7 +73,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     input_validator_ = std::make_unique<InputValidator>();
     logger_ = std::make_unique<LocalLogger>();
 
-    replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, shutdown_,
+    replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, metadata_.sync_interval, shutdown_,
     [this](const vector_db::WALEntry& entry) {
         return this->ApplyWALEntry(entry);
     },
@@ -85,7 +87,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
         return this->store_map_;
     },
     logger_.get());
-    cleaner_ = std::make_unique<Cleaner>(metadata_.name, shutdown_,
+    cleaner_ = std::make_unique<Cleaner>(metadata_.name, metadata_.cleanup_interval, shutdown_,
     [this](const std::string& table_name, bool force) {
         this->Cleanup(table_name, force);
     },
