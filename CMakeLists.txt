@@ -46,6 +46,7 @@ gtest_discover_tests(vector_db_unit_tests)
 
 add_executable(vector_db_e2e_tests
         server/tests/vector_database_test.cc
+        server/tests/vector_database_replica_test.cc
 )
 
 target_link_libraries(vector_db_e2e_tests
