@@ -22,8 +22,9 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(googletest)
+include(GoogleTest)
 
-add_executable(vector_db_tests
+add_executable(vector_db_unit_tests
         engine/tests/hnsw_index_test.cc
         engine/tests/flat_index_test.cc
         engine/tests/vector_store_test.cc
@@ -33,14 +34,24 @@ add_executable(vector_db_tests
         engine/tests/cleaner_test.cc
         engine/tests/lru_cache_test.cc
         engine/tests/engine_test.cc
-        server/tests/vector_database_test.cc
 )
 
-target_link_libraries(vector_db_tests
+target_link_libraries(vector_db_unit_tests
         PRIVATE
         server
         GTest::gmock_main
 )
 
-include(GoogleTest)
-gtest_discover_tests(vector_db_tests)
+gtest_discover_tests(vector_db_unit_tests)
+
+add_executable(vector_db_e2e_tests
+        server/tests/vector_database_test.cc
+)
+
+target_link_libraries(vector_db_e2e_tests
+        PRIVATE
+        server
+        GTest::gmock_main
+)
+
+gtest_discover_tests(vector_db_e2e_tests)
