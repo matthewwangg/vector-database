@@ -458,7 +458,7 @@ void VectorPersistenceManager::Clear() {
     std::filesystem::remove(metadata_file_path_);
 }
 
-std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(int offset) {
+std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(std::uint64_t offset) {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
 
     std::vector<vector_db::WALEntry> entries;

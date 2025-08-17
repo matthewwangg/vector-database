@@ -44,7 +44,7 @@ public:
     void ClearWAL();
     void Clear();
 
-    std::vector<vector_db::WALEntry> SerializeWALEntries(int offset);
+    std::vector<vector_db::WALEntry> SerializeWALEntries(std::uint64_t offset);
 
 private:
     std::string GetFullFilepath(const std::string& file_path);
