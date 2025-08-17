@@ -24,7 +24,7 @@ FlatIndex::FlatIndex(const FlatIndexConfig& config, std::unordered_map<Id, Vecto
 void FlatIndex::Insert(Id id, const Vector& vector) {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
 
-    if (vector.size() != config_.vector_dimensionality) {
+    if (vector.size() != config_.vector_dimensionality || vectors_.contains(id)) {
         return;
     }
     vectors_.insert({id, vector});

@@ -23,7 +23,7 @@ namespace vector_db_engine {
 constexpr int kShutdownCheckInterval = 1000;
 constexpr int kRetryCount = 3;
 
-ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_server_address, std::vector<std::string> replicas, int sync_interval, std::atomic<bool>& shutdown, const std::function<bool(const vector_db::WALEntry&)>& apply_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()> get_persistence_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()> get_stats_manager_map_callback, std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()> get_vector_store_map_callback, Logger* logger)
+ReplicaManager::ReplicaManager(const std::string& name, bool primary, const std::string& sync_server_address, const std::vector<std::string>& replicas, int sync_interval, std::atomic<bool>& shutdown, const std::function<bool(const vector_db::WALEntry&)>& apply_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>>&()>& get_persistence_manager_map_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()>& get_stats_manager_map_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()>& get_vector_store_map_callback, Logger* logger)
     : name_(name),
       primary_(primary),
       sync_server_address_(sync_server_address),
@@ -44,9 +44,6 @@ ReplicaManager::ReplicaManager(std::string name, bool primary, std::string sync_
 }
 
 ReplicaManager::~ReplicaManager() {
-    {
-        std::unique_lock<std::mutex> lock(sync_mutex_);
-    }
     sync_cv_.notify_one();
     if (sync_thread_.joinable()) {
         sync_thread_.join();
@@ -147,7 +144,7 @@ void ReplicaManager::Sync(bool force) {
                     vector_db::GetChecksumResponse checksum_response;
                     grpc::ClientContext checksum_context;
                     grpc::Status checksum_status = stub->GetChecksum(&checksum_context, checksum_request, &checksum_response);
-                    if (status.ok() && checksum == checksum_response.checksum()) {
+                    if (checksum_status.ok() && checksum == checksum_response.checksum()) {
                         break;
                     }
                     failed = true;

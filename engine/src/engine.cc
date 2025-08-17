@@ -69,35 +69,27 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
         return tables;
     }();
 
+    auto apply_wal_entry = [this](const vector_db::WALEntry& entry) {
+        return this->ApplyWALEntry(entry);
+    };
+    auto cleanup = [this](const std::string& table_name, bool force) {
+        this->Cleanup(table_name, force);
+    };
+    auto get_persistence_manager_map = [this]() -> const auto& {
+        return this->persistence_manager_map_;
+    };
+    auto get_stats_manager_map = [this]() -> const auto& {
+        return this->stats_manager_map_;
+    };
+    auto get_store_map = [this]() -> const auto& {
+        return this->store_map_;
+    };
+
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
     input_validator_ = std::make_unique<InputValidator>();
     logger_ = std::make_unique<LocalLogger>();
-
-    replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, metadata_.sync_interval, shutdown_,
-    [this](const vector_db::WALEntry& entry) {
-        return this->ApplyWALEntry(entry);
-    },
-    [this]() -> const auto& {
-        return this->persistence_manager_map_;
-    },
-    [this]() -> const auto& {
-        return this->stats_manager_map_;
-    },
-    [this]() -> const auto& {
-        return this->store_map_;
-    },
-    logger_.get());
-    cleaner_ = std::make_unique<Cleaner>(metadata_.name, metadata_.cleanup_interval, shutdown_,
-    [this](const std::string& table_name, bool force) {
-        this->Cleanup(table_name, force);
-    },
-    [this]() -> const auto& {
-        return this->store_map_;
-    },
-    [this]() -> const auto& {
-     return this->stats_manager_map_;
-    },
-    logger_.get());
+    replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, metadata_.sync_interval, shutdown_, apply_wal_entry, get_persistence_manager_map, get_stats_manager_map, get_store_map, logger_.get());
+    cleaner_ = std::make_unique<Cleaner>(metadata_.name, metadata_.cleanup_interval, shutdown_, cleanup, get_store_map, get_stats_manager_map, logger_.get());
 
     for (const std::string& table : table_names) {
         int vector_dimensionality;
@@ -109,9 +101,9 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
             std::string filepath = std::string(std::getenv("HOME")) + "/.vector_db/" + metadata_.name + "/" + table + "_" + kMetadataFilename;
             std::ifstream in(filepath, std::ios::binary);
             if (!in) {
-                std::cout << "failed to open " << filepath << std::endl;
                 return;
             }
+
             vector_db::TableMetadata table_metadata;
             table_metadata.ParseFromIstream(&in);
 
@@ -135,9 +127,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
         if (loaded_store) {
             store_map_[table] = std::move(loaded_store);
         }
-        persistence_manager_map_[table]->ReplayWAL([this](const vector_db::WALEntry& entry) {
-            this->ApplyWALEntry(entry);
-        });
+        persistence_manager_map_[table]->ReplayWAL(apply_wal_entry);
         stats_manager_map_[table]->Set(StatsManager::StatType::VECTOR, store_map_[table]->GetStore().size());
     }
 }

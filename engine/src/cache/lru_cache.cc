@@ -20,7 +20,7 @@ std::optional<LRUCache::CacheEntry> LRUCache::Get(const CacheKey& key) {
     keys_.push_back(key);
     it->second.second = std::prev(keys_.end());
 
-    return cache_.at(key).first;
+    return it->second.first;
 }
 
 void LRUCache::Invalidate(const CacheKey& key) {

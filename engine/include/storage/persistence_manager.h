@@ -1,5 +1,5 @@
-#ifndef VECTOR_DATABASE_STORAGE_H
-#define VECTOR_DATABASE_STORAGE_H
+#ifndef VECTOR_DATABASE_PERSISTENCE_MANAGER_H
+#define VECTOR_DATABASE_PERSISTENCE_MANAGER_H
 
 #include <cstdint>
 #include <fstream>
@@ -24,11 +24,11 @@ using Vector = std::vector<float>;
 class VectorPersistenceManager {
 public:
     enum class StoredIndexType {
-        HNSW = 0,
-        FLAT = 1,
+        HNSW,
+        FLAT,
     };
 
-    VectorPersistenceManager(std::string name, StoredIndexType stored_index_type, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path, std::string metadata_file_path, Logger* logger);
+    VectorPersistenceManager(const std::string& name, StoredIndexType stored_index_type, const std::string& store_snapshot_file_path, const std::string& index_snapshot_file_path, const std::string& wal_file_path, const std::string& metadata_file_path, Logger* logger);
 
     void SaveSnapshot(const VectorStore& store) const;
     std::unique_ptr<VectorStore> LoadSnapshot() const;
@@ -44,10 +44,10 @@ public:
     void ClearWAL();
     void Clear();
 
-    std::vector<vector_db::WALEntry> SerializeWALEntries(int offset);
+    std::vector<vector_db::WALEntry> SerializeWALEntries(std::uint64_t offset);
 
 private:
-    std::string GetFullFilepath(std::string file_path);
+    std::string GetFullFilepath(const std::string& file_path);
 
     std::string name_;
     std::string table_name_;
@@ -67,4 +67,4 @@ private:
 
 } // namespace vector_db_engine
 
-#endif //VECTOR_DATABASE_STORAGE_H
+#endif //VECTOR_DATABASE_PERSISTENCE_MANAGER_H

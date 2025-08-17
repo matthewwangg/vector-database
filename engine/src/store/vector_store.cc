@@ -61,10 +61,11 @@ std::vector<VectorStore::Data> VectorStore::Search(const Vector& query, std::siz
 
     std::vector<Data> results;
     for (Id id : result_ids) {
-        if (!store_.contains(id)) {
+        auto it = store_.find(id);
+        if (it == store_.end()) {
             continue;
         }
-        results.push_back(store_.at(id));
+        results.push_back(it->second);
     }
 
     return results;

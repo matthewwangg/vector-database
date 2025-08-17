@@ -15,7 +15,7 @@
 
 namespace vector_db_engine {
 
-Cleaner::Cleaner(std::string name, int cleanup_interval, std::atomic<bool>& shutdown, const std::function<void(const std::string&, bool)>& cleanup_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()>& get_store_map_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()>& get_stats_manager_map_callback,  Logger* logger)
+Cleaner::Cleaner(const std::string& name, int cleanup_interval, std::atomic<bool>& shutdown, const std::function<void(const std::string&, bool)>& cleanup_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()>& get_store_map_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()>& get_stats_manager_map_callback,  Logger* logger)
     : name_(name),
       cleanup_interval_(cleanup_interval),
       shutdown_(shutdown),
