@@ -19,7 +19,7 @@
 
 namespace vector_db_engine {
 
-VectorPersistenceManager::VectorPersistenceManager(std::string name, StoredIndexType stored_index_type, std::string store_snapshot_file_path, std::string index_snapshot_file_path, std::string wal_file_path, std::string metadata_file_path, Logger* logger)
+VectorPersistenceManager::VectorPersistenceManager(const std::string& name, StoredIndexType stored_index_type, const std::string& store_snapshot_file_path, const std::string& index_snapshot_file_path, const std::string& wal_file_path, const std::string& metadata_file_path, Logger* logger)
     : name_(name),
       stored_index_type_(stored_index_type),
       store_snapshot_file_path_(GetFullFilepath(store_snapshot_file_path)),
@@ -28,7 +28,7 @@ VectorPersistenceManager::VectorPersistenceManager(std::string name, StoredIndex
       metadata_file_path_(GetFullFilepath(metadata_file_path)),
       logger_(logger)
 {
-    const std::string base = std::string(std::getenv("HOME")) + "/.vector_db/" + name_ + "/";
+    const std::string base = GetFullFilepath("");
     const std::string suffix = "_wal.log";
     table_name_ = wal_file_path_.substr(base.size(), wal_file_path_.size() - base.size() - suffix.size());
 
@@ -43,12 +43,12 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
     store_snapshot.set_vector_dimensionality(store.GetVectorDimensionality());
     std::string index_type_string;
 
-    for (auto &[id, data]: store.GetStore()) {
-        auto *vector_entry = store_snapshot.add_vector_entry();
+    for (const auto& [id, data] : store.GetStore()) {
+        auto* vector_entry = store_snapshot.add_vector_entry();
         vector_entry->set_id(id);
         vector_entry->set_content(data.content);
 
-        for (float value: data.vector) {
+        for (float value : data.vector) {
             vector_entry->add_vector(value);
         }
     }
@@ -87,18 +87,18 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
             index_snapshot.set_distance_metric(vector_db::COSINE);
         }
 
-        for (const auto &[id, node]: index->GetNodes()) {
+        for (const auto& [id, node] : index->GetNodes()) {
             vector_db::Node storage_node;
             storage_node.set_level(node.level);
             storage_node.set_active(node.active);
 
-            for (float value: node.vector) {
+            for (float value : node.vector) {
                 storage_node.add_vector(value);
             }
 
-            for (const auto &[level, ids]: node.neighbors) {
+            for (const auto& [level, ids] : node.neighbors) {
                 vector_db::IdSet id_set;
-                for (Id neighbor_id: ids) {
+                for (Id neighbor_id : ids) {
                     id_set.add_id(neighbor_id);
                 }
                 (*storage_node.mutable_neighbors())[level] = std::move(id_set);
@@ -106,7 +106,7 @@ void VectorPersistenceManager::SaveSnapshot(const VectorStore& store) const {
             (*index_snapshot.mutable_nodes())[id] = std::move(storage_node);
         }
 
-        for (const auto &[level, ids]: index->GetNodeLevels()) {
+        for (const auto& [level, ids] : index->GetNodeLevels()) {
             vector_db::IdSet id_set;
             for (Id id: ids) {
                 id_set.add_id(id);
@@ -193,13 +193,13 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
         }
 
         std::unordered_map<Id, HNSWIndex::Node> reconstructed_nodes;
-        for (const auto &[id, storage_node]: index_snapshot.nodes()) {
+        for (const auto& [id, storage_node] : index_snapshot.nodes()) {
             HNSWIndex::Node node;
             node.level = storage_node.level();
             node.active = storage_node.active();
             node.vector.assign(storage_node.vector().begin(), storage_node.vector().end());
 
-            for (const auto &[level, ids]: storage_node.neighbors()) {
+            for (const auto& [level, ids] : storage_node.neighbors()) {
                 std::unordered_set neighbor_ids(ids.id().begin(), ids.id().end());
                 node.neighbors[level] = std::move(neighbor_ids);
             }
@@ -208,7 +208,7 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
         }
 
         std::unordered_map<int, std::unordered_set<Id>> reconstructed_node_levels;
-        for (const auto &[level, ids]: index_snapshot.node_levels()) {
+        for (const auto& [level, ids] : index_snapshot.node_levels()) {
             std::unordered_set<Id> id_set(ids.id().begin(), ids.id().end());
             reconstructed_node_levels[level] = std::move(id_set);
         }
@@ -254,7 +254,7 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
     store_snapshot.ParseFromIstream(&in_store);
 
     std::unordered_map<Id, VectorStore::Data> reconstructed_store;
-    for (const auto &vector_entry: store_snapshot.vector_entry()) {
+    for (const auto& vector_entry: store_snapshot.vector_entry()) {
         Vector vector(vector_entry.vector().begin(), vector_entry.vector().end());
         Id id = vector_entry.id();
         reconstructed_store[id] = {id, vector, vector_entry.content()};
@@ -272,7 +272,7 @@ std::unique_ptr<VectorStore> VectorPersistenceManager::LoadSnapshot() const {
                   std::to_string(store_snapshot.vector_entry_size()) + " vectors, and dimensionality of " +
                   std::to_string(store_snapshot.vector_dimensionality()), name_);
 
-    return std::move(loaded_store);
+    return loaded_store;
 }
 
 void VectorPersistenceManager::SaveMetadata(int vector_dimensionality, const HNSWIndex::HNSWIndexConfig& hnsw_index_config, const FlatIndex::FlatIndexConfig& flat_index_config, std::size_t cache_size) const {
@@ -442,11 +442,11 @@ void VectorPersistenceManager::ClearWAL() {
     std::lock_guard<std::mutex> lock(wal_log_mutex_);
 
     bool clear = std::filesystem::exists(wal_file_path_) && std::filesystem::file_size(wal_file_path_) > 0;
-    std::ofstream clear_log(wal_file_path_, std::ios::trunc);
-
     if (!clear) {
         return;
     }
+
+    std::ofstream clear_log(wal_file_path_, std::ios::trunc);
 
     logger_->Info(table_name_ + " write-ahead log cleared", name_);
 }
@@ -566,7 +566,7 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(i
     return entries;
 }
 
-std::string VectorPersistenceManager::GetFullFilepath(std::string file_path) {
+std::string VectorPersistenceManager::GetFullFilepath(const std::string& file_path) {
     const char* home = std::getenv("HOME");
     if (!home) {
         return file_path;
