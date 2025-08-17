@@ -70,7 +70,6 @@ public:
 private:
     Metadata metadata_;
     std::atomic<bool> shutdown_;
-    std::atomic<bool> modified_;
 
     std::unordered_map<std::string, std::unique_ptr<VectorStore>> store_map_;
     std::unordered_map<std::string, std::unique_ptr<VectorPersistenceManager>> persistence_manager_map_;
