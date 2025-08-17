@@ -24,8 +24,8 @@ public:
     };
 
     enum class IndexType {
-        HNSW = 0,
-        FLAT = 1,
+        HNSW,
+        FLAT,
     };
 
     explicit VectorStore(IndexType index_type, std::unique_ptr<VectorIndex> index, int vector_dimensionality);
