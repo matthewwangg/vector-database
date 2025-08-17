@@ -42,7 +42,9 @@ ThreadPool::~ThreadPool() {
     cv_.notify_all();
 
     for (auto& thread : threads_) {
-        thread.join();
+        if (thread.joinable()) {
+            thread.join();
+        }
     }
 }
 

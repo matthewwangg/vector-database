@@ -8,42 +8,42 @@
 
 namespace vector_db_engine {
 
-bool InputValidator::ValidateInsert(std::string table_name, Id id, const Vector& vector, const std::string& content) {
+bool InputValidator::ValidateInsert(const std::string& table_name, Id id, const Vector& vector, const std::string& content) {
     if (table_name.empty() || vector.empty() || content.empty()) {
         return false;
     }
     return true;
 }
 
-bool InputValidator::ValidateRemove(std::string table_name, Id id) {
+bool InputValidator::ValidateRemove(const std::string& table_name, Id id) {
     if (table_name.empty()) {
         return false;
     }
     return true;
 }
 
-bool InputValidator::ValidateSearch(std::string table_name, const Vector& query, std::size_t k, std::size_t search_param) {
-    if (table_name.empty() || query.empty() || k < 0) {
+bool InputValidator::ValidateSearch(const std::string& table_name, const Vector& query, std::size_t k, std::size_t search_param) {
+    if (table_name.empty() || query.empty() || k == 0) {
         return false;
     }
     return true;
 }
 
-bool InputValidator::ValidateStats(std::string table_name) {
+bool InputValidator::ValidateStats(const std::string& table_name) {
     if (table_name.empty()) {
         return false;
     }
     return true;
 }
 
-bool InputValidator::ValidateMetrics(std::string table_name) {
+bool InputValidator::ValidateMetrics(const std::string& table_name) {
     if (table_name.empty()) {
         return false;
     }
     return true;
 }
 
-bool InputValidator::ValidateCreateTable(std::string name, int vector_dimensionality, const HNSWIndex::HNSWIndexConfig& hnsw_index_config, const FlatIndex::FlatIndexConfig& flat_index_config, std::size_t cache_size) {
+bool InputValidator::ValidateCreateTable(const std::string& name, int vector_dimensionality, const HNSWIndex::HNSWIndexConfig& hnsw_index_config, const FlatIndex::FlatIndexConfig& flat_index_config, std::size_t cache_size) {
     if (name.empty() || vector_dimensionality == 0) {
         return false;
     }
@@ -64,7 +64,7 @@ bool InputValidator::ValidateCreateTable(std::string name, int vector_dimensiona
     return true;
 }
 
-bool InputValidator::ValidateDropTable(std::string name) {
+bool InputValidator::ValidateDropTable(const std::string& name) {
     if (name.empty()) {
         return false;
     }

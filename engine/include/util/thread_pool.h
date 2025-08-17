@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <thread>
 #include <vector>
 
 namespace vector_db_engine {
@@ -32,10 +33,13 @@ private:
 
 template<typename Function, typename... Arguments>
 auto ThreadPool::EnqueueTask(Function&& function, Arguments&&... arguments) -> std::future<std::invoke_result_t<Function, Arguments...>> {
+    if (stop_) {
+        return std::future<std::invoke_result_t<Function, Arguments...>>();
+    }
     auto task = std::make_shared<std::packaged_task<std::invoke_result_t<Function, Arguments...>()>>(std::bind(std::forward<Function>(function), std::forward<Arguments>(arguments)...));
     std::future<std::invoke_result_t<Function, Arguments...>> result = task->get_future();
     {
-        std::unique_lock lock(queue_mutex_);
+        std::unique_lock<std::mutex> lock(queue_mutex_);
         tasks_.emplace([task]() {
             (*task)();
         });
