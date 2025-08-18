@@ -56,3 +56,16 @@ target_link_libraries(vector_db_e2e_tests
 )
 
 gtest_discover_tests(vector_db_e2e_tests)
+
+add_executable(vector_db_benchmark_tests
+        server/tests/vector_database_benchmark_test.cc
+)
+
+target_link_libraries(vector_db_benchmark_tests
+        PRIVATE
+        server
+        GTest::gmock_main
+)
+
+gtest_discover_tests(vector_db_benchmark_tests)
+

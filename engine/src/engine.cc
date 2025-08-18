@@ -87,7 +87,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
 
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
     input_validator_ = std::make_unique<InputValidator>();
-    logger_ = std::make_unique<LocalLogger>();
+    logger_ = std::make_unique<SilentLogger>();
     replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, metadata_.sync_interval, shutdown_, apply_wal_entry, get_persistence_manager_map, get_stats_manager_map, get_store_map, logger_.get());
     cleaner_ = std::make_unique<Cleaner>(metadata_.name, metadata_.cleanup_interval, shutdown_, cleanup, get_store_map, get_stats_manager_map, logger_.get());
 
