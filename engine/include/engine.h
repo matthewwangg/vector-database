@@ -40,9 +40,17 @@ public:
         bool use_cache;
         int cleanup_interval;
         int sync_interval;
+
+        enum class LoggerType {
+            SILENT,
+            LOCAL,
+            REMOTE,
+        };
+
+        LoggerType logger_type;
     };
 
-    explicit Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string primary_address = "", std::vector<std::string> replicas = {}, int cleanup_interval = 60, int sync_interval = 90);
+    explicit Engine(std::string name, bool primary, float reindex_threshold, bool use_cache, std::string primary_address = "", std::vector<std::string> replicas = {}, int cleanup_interval = 60, int sync_interval = 90, Metadata::LoggerType logger_type = Metadata::LoggerType::SILENT);
     ~Engine();
 
     bool Insert(std::string table_name, Id id, const Vector& vector, const std::string& content);

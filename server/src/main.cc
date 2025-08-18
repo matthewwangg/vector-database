@@ -8,9 +8,10 @@
 
 #include <grpcpp/grpcpp.h>
 
+#include "engine.h"
+#include "hnsw_index.h"
 #include "vector_db_service_impl.h"
 #include "vector_store.h"
-#include "hnsw_index.h"
 
 #include "server.grpc.pb.h"
 #include "server.pb.h"
@@ -47,6 +48,7 @@ int main(int argc, char* argv[]) {
     int sync_interval = 90000;
     std::string sync_server_address;
     std::vector<std::string> replicas;
+    vector_db_engine::Engine::Metadata::LoggerType logger_type = vector_db_engine::Engine::Metadata::LoggerType::LOCAL;
 
     for (int i = 3; i < argc; ++i) {
         std::string arg = argv[i];
@@ -62,13 +64,22 @@ int main(int argc, char* argv[]) {
             cleanup_interval = std::stoi(argv[++i]);
         } else if (arg == "--sync-interval" && argc > i + 1) {
             sync_interval = std::stoi(argv[++i]);
+        } else if (arg == "--logger-type" && argc > i + 1) {
+            std::string logger_type_string = argv[++i];
+            if (logger_type_string == "silent") {
+                logger_type = vector_db_engine::Engine::Metadata::LoggerType::SILENT;
+            } else if (logger_type_string == "remote") {
+                logger_type = vector_db_engine::Engine::Metadata::LoggerType::REMOTE;
+            } else {
+                logger_type = vector_db_engine::Engine::Metadata::LoggerType::LOCAL;
+            }
         } else {
             std::cout << "usage: " << argv[0] << " <name> <server-address> [flags]" << std::endl;
             return 1;
         }
     }
 
-    auto engine = std::make_unique<vector_db_engine::Engine>(name, primary, reindex_threshold, use_cache, sync_server_address, replicas, cleanup_interval, sync_interval);
+    auto engine = std::make_unique<vector_db_engine::Engine>(name, primary, reindex_threshold, use_cache, sync_server_address, replicas, cleanup_interval, sync_interval, logger_type);
 
     VectorDatabaseServiceImpl vector_db_service(std::move(engine));
 
