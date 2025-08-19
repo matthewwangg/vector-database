@@ -91,6 +91,7 @@ std::uint64_t VectorStore::ComputeChecksum() {
     }
     std::sort(ids.begin(), ids.end());
 
+    // Computes checksum with a simple rolling hash with prime multiplier. Note that it is not cryptographically strong.
     for (const Id& id : ids) {
         const Data& data = store_.at(id);
         checksum = checksum * 71 + id;

@@ -13,7 +13,7 @@ namespace vector_db_engine {
 using Id = std::uint64_t;
 using Vector = std::vector<float>;
 
-// InputValidator is responsible for taking in the input of the core vector database operations on the engine interface. It determines whether those inputs are valid for use.
+// InputValidator is responsible for validation of the input to the core vector database operations on the engine interface. It determines whether those inputs are valid for use.
 class InputValidator {
 public:
     InputValidator() = default;

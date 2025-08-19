@@ -14,7 +14,7 @@
 
 namespace vector_db_engine {
 
-// ThreadPool is responsible for handling tasks, specifically batch search operations.
+// ThreadPool is responsible for thread-safe concurrent task execution, specifically for batch search operations.
 class ThreadPool {
 public:
     // Create the thread pool by spawning num_threads threads immediately.
