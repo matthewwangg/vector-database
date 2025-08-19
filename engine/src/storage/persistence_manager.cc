@@ -30,8 +30,11 @@ VectorPersistenceManager::VectorPersistenceManager(const std::string& name, Stor
 {
     const std::string base = GetFullFilepath("");
     const std::string suffix = "_wal.log";
+
+    // Parse table name from filepath.
     table_name_ = wal_file_path_.substr(base.size(), wal_file_path_.size() - base.size() - suffix.size());
 
+    // Keep file open in append mode while persistence manager exists.
     wal_out_.open(wal_file_path_, std::ios::app);
     if (!wal_out_) {
         logger_->Error("failed to open write-ahead log", name_);
@@ -369,9 +372,12 @@ void VectorPersistenceManager::ReplayWAL(const std::function<void(const vector_d
 
             std::string content;
             std::getline(stream, content);
+
+            // Clear out the delimiter between vector and content.
             if (content.starts_with("| ")) {
                 content = content.substr(2);
             }
+
             entry.mutable_insert_config()->set_content(content);
         }
         if (command == "remove") {
@@ -446,6 +452,7 @@ void VectorPersistenceManager::ClearWAL() {
         return;
     }
 
+    // Truncate the WAL file, but leave it existing.
     std::ofstream clear_log(wal_file_path_, std::ios::trunc);
 
     logger_->Info(table_name_ + " write-ahead log cleared", name_);
@@ -471,6 +478,7 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(s
     std::string line;
     int current_line = 0;
     while (std::getline(wal_in, line)) {
+        // Add check to only parse lines including and after offset line.
         if (current_line < offset) {
             current_line++;
             continue;
@@ -500,9 +508,12 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(s
 
             std::string content;
             std::getline(stream, content);
+
+            // Clear out the delimiter between vector and content.
             if (content.starts_with("| ")) {
                 content = content.substr(2);
             }
+
             entry.mutable_insert_config()->set_content(content);
         }
         if (command == "remove") {
@@ -567,6 +578,7 @@ std::vector<vector_db::WALEntry> VectorPersistenceManager::SerializeWALEntries(s
 }
 
 std::string VectorPersistenceManager::GetFullFilepath(const std::string& file_path) {
+    // Use $HOME/.vector_db/ for storing persistent table files if $HOME specified.
     const char* home = std::getenv("HOME");
     if (!home) {
         return file_path;

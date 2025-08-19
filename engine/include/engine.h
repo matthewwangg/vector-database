@@ -29,7 +29,7 @@
 
 namespace vector_db_engine {
 
-// Engine is the central API for all vector database operations. It coordinates all core operations, table management, data persistence, replication, cleanup. It also owns all pointers related to the database abstractions. Operations are thread-safe at a table level.
+// Engine is the central API for all vector database operations. It coordinates all core operations, table management, data persistence, replication, cleanup. It also owns all pointers related to the database abstractions except index, which is owned by vector store. Operations are thread-safe at a table level.
 class Engine {
 public:
     struct Metadata {
