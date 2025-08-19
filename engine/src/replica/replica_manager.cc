@@ -40,6 +40,8 @@ ReplicaManager::ReplicaManager(const std::string& name, bool primary, const std:
         sync_thread_ = std::thread(&ReplicaManager::RunReplicaSyncLoop, this);
     } else if (!primary_) {
         sync_thread_ = std::thread(&ReplicaManager::RunReplicaServer, this);
+    } else {
+        // If no replicas specified on the primary, do nothing.
     }
 }
 
@@ -65,6 +67,7 @@ void ReplicaManager::RunReplicaServer() {
     logger_->Info("replica sync server running on " + sync_server_address_, name_);
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
+    // Create a background thread to wait for the shutdown trigger.
     std::thread shutdown_thread([&server, this]() {
         std::unique_lock<std::mutex> lock(sync_mutex_);
         sync_cv_.wait(lock, [this]() {
@@ -98,6 +101,7 @@ void ReplicaManager::RunReplicaSyncLoop() {
             continue;
         }
 
+        // Measure the latency of the sync operation.
         auto start = std::chrono::steady_clock::now();
         Sync(false);
         auto end = std::chrono::steady_clock::now();
@@ -111,7 +115,6 @@ void ReplicaManager::Sync(bool force) {
         return;
     }
 
-
     const auto& persistence_manager_map = get_persistence_manager_map_callback_();
     const auto& vector_store_map = get_vector_store_map_callback_();
     const auto& stats_manager_map = get_stats_manager_map_callback_();
@@ -121,6 +124,7 @@ void ReplicaManager::Sync(bool force) {
             continue;
         }
         for (const auto& replica : replicas_) {
+            // Retry the sync operation a constant kRetryCount number of times.
             for (int i = 0; i < kRetryCount; ++i) {
                 vector_db::SyncRequest request;
                 std::vector<vector_db::WALEntry> entries = persistence_manager->SerializeWALEntries(wal_offsets_per_replica_map_[table][replica]);
@@ -139,6 +143,7 @@ void ReplicaManager::Sync(bool force) {
                 grpc::Status status = stub->Sync(&context, request, &response);
                 wal_offsets_per_replica_map_[table][replica] = wal_offsets_per_replica_map_[table][replica] + response.successful_count();
                 if (status.ok() && response.successful_count() == entries.size()) {
+                    // Compare the checksum of the replica store with the primary store to determine if they are in sync.
                     vector_db::GetChecksumRequest checksum_request;
                     checksum_request.set_table(table);
                     vector_db::GetChecksumResponse checksum_response;
@@ -155,6 +160,7 @@ void ReplicaManager::Sync(bool force) {
                 }
             }
         }
+        // Only indicate the modified flag is false if all sync operations are successful.
         if (!failed) {
             if (!stats_manager_map.contains(table)) {
                 continue;
