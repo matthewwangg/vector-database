@@ -39,7 +39,10 @@ void MetricsManager::Increment(MetricsManager::CountType count_type, uint64_t st
 
 void MetricsManager::CalculateSearchLatency(float latency) {
     std::unique_lock lock(metrics_mutex_);
+
+    // Update the average search latency using the current average latency, the new latency, and the new search count.
     metrics_.average_search_latency_ms = ((metrics_.average_search_latency_ms * metrics_.search_count) + latency) / (metrics_.search_count + 1);
+    
     metrics_.max_search_latency_ms = std::max(metrics_.max_search_latency_ms, latency);
     metrics_.min_search_latency_ms = std::min(metrics_.min_search_latency_ms, latency);
 }

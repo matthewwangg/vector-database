@@ -8,6 +8,7 @@
 
 namespace vector_db_engine {
 
+// MetricsManager is responsible for tracking and calculating the per-table metrics for the vector database, including each operation count, search latency, and the cache hits and misses.
 class MetricsManager {
 public:
     struct Metrics {
@@ -39,7 +40,10 @@ public:
 
     Metrics GetMetrics() const;
 
+    // Increment the metrics type by the step value input.
     void Increment(CountType count_type, uint64_t step);
+
+    // Calculate the minimum, maximum, and average search latency on each search.
     void CalculateSearchLatency(float latency);
 
 private:
