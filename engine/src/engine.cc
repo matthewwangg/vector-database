@@ -655,7 +655,7 @@ bool Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
         FlatIndex::FlatIndexConfig flat_index_config = {flat_config.vector_dimensionality(), (flat_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine)};
 
         if (metadata_.primary) {
-            // This case should currently never be used, but can be used in future.
+            // This case should currently never be used, but can be used in the future.
             ok = CreateTable(entry.table(), store_config.vector_dimensionality(), hnsw_index_config, flat_index_config, cache_config.cache_size());
         } else {
             std::unique_lock replica_lock(replica_mutex_);
@@ -667,7 +667,7 @@ bool Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
         const auto& config = entry.drop_config();
         bool ok = false;
         if (metadata_.primary) {
-            // This case should currently never be used, but can be used in future.
+            // This case should currently never be used, but can be used in the future.
             ok = DropTable(entry.table());
         } else {
             std::unique_lock replica_lock(replica_mutex_);

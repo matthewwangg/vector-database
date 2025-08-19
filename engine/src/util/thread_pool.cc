@@ -20,6 +20,7 @@ ThreadPool::ThreadPool(std::size_t num_threads)
                         return stop_ || !tasks_.empty();
                     });
 
+                    // Only stop this thread once the stop flag has been set and there are no remaining tasks.
                     if (stop_ && tasks_.empty()) {
                         break;
                     }
@@ -39,6 +40,8 @@ ThreadPool::~ThreadPool() {
         std::unique_lock lock(queue_mutex_);
         stop_ = true;
     }
+
+    // Notify all threads to clear out any tasks left in the queue and to stop.
     cv_.notify_all();
 
     for (auto& thread : threads_) {
