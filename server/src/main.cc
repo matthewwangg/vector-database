@@ -41,6 +41,7 @@ int main(int argc, char* argv[]) {
     std::string name = argv[1];
     std::string server_address = argv[2];
 
+    // Default values if no flags are set.
     bool primary = true;
     float reindex_threshold = 0.25f;
     bool use_cache = true;
@@ -96,6 +97,7 @@ int main(int argc, char* argv[]) {
     vector_db_service.GetEngine()->GetLogger()->Info("server running on " + server_address + type_indicator, name);
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
+    // Starts a background thread to listen for a shutdown.
     std::thread shutdown_thread([&server, &vector_db_service, &name]() {
         while (!shutdown) {
             std::this_thread::sleep_for(std::chrono::milliseconds(kShutdownCheckInterval));

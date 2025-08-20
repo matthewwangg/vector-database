@@ -216,7 +216,3 @@ grpc::Status VectorDatabaseServiceImpl::HealthCheck(grpc::ServerContext* context
 
     return grpc::Status::OK;
 }
-
-vector_db_engine::Engine* VectorDatabaseServiceImpl::GetEngine() const {
-    return engine_.get();
-}
