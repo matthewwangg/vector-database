@@ -46,6 +46,7 @@ void Cleaner::BackgroundCleanupLoop() {
         const auto& stats_manager_map = get_stats_manager_map_callback_();
         for (auto& [table, store] : store_map) {
             if (stats_manager_map.contains(table) && stats_manager_map.at(table)->GetRemovedFlag()) {
+                // Measure the latency of the cleanup operation.
                 auto start = std::chrono::steady_clock::now();
                 cleanup_callback_(table, false);
                 auto end = std::chrono::steady_clock::now();
