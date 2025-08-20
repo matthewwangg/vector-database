@@ -50,6 +50,7 @@ void LRUCache::Store(const CacheKey& key, const CacheEntry& entry) {
         return;
     }
 
+    // If the cache is at capacity and needs to add a new entry, evict the least recently used entry.
     if (cache_.size() == max_cache_size_) {
         cache_.erase(keys_.front());
         keys_.pop_front();
