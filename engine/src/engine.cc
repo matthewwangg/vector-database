@@ -53,23 +53,6 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
         .logger_type = logger_type,
     };
 
-    std::vector<std::string> table_names = [&]() {
-        std::vector<std::string> tables;
-        const std::string suffix = "_" + kWriteAheadLogFilename;
-
-        const std::string base_directory = std::string(std::getenv("HOME")) + "/.vector_db/" + metadata_.name;
-        std::filesystem::create_directories(base_directory);
-        for (const auto& entry : std::filesystem::directory_iterator(base_directory)) {
-            if (entry.is_regular_file()) {
-                std::string filename = entry.path().filename().string();
-                if (filename.size() > suffix.size() && filename.compare(filename.size() - suffix.size(), suffix.size(), suffix) == 0) {
-                    tables.push_back(filename.substr(0, filename.size() - suffix.size()));
-                }
-            }
-        }
-        return tables;
-    }();
-
     auto apply_wal_entry = [this](const vector_db::WALEntry& entry) {
         return this->ApplyWALEntry(entry);
     };
@@ -99,12 +82,31 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, metadata_.sync_interval, shutdown_, apply_wal_entry, get_persistence_manager_map, get_stats_manager_map, get_store_map, logger_.get());
     cleaner_ = std::make_unique<Cleaner>(metadata_.name, metadata_.cleanup_interval, shutdown_, cleanup, get_store_map, get_stats_manager_map, logger_.get());
 
+    // Discover tables to restore by scanning for WAL files, empty or not.
+    std::vector<std::string> table_names = [&]() {
+        std::vector<std::string> tables;
+        const std::string suffix = "_" + kWriteAheadLogFilename;
+
+        const std::string base_directory = std::string(std::getenv("HOME")) + "/.vector_db/" + metadata_.name;
+        std::filesystem::create_directories(base_directory);
+        for (const auto& entry : std::filesystem::directory_iterator(base_directory)) {
+            if (entry.is_regular_file()) {
+                std::string filename = entry.path().filename().string();
+                if (filename.size() > suffix.size() && filename.compare(filename.size() - suffix.size(), suffix.size(), suffix) == 0) {
+                    tables.push_back(filename.substr(0, filename.size() - suffix.size()));
+                }
+            }
+        }
+        return tables;
+    }();
+
     for (const std::string& table : table_names) {
         int vector_dimensionality;
         std::size_t cache_size;
         HNSWIndex::HNSWIndexConfig hnsw_index_config = {};
         FlatIndex::FlatIndexConfig flat_index_config = {};
 
+        // Load all table metadata from metadata.bin files.
         [&]() {
             std::string filepath = std::string(std::getenv("HOME")) + "/.vector_db/" + metadata_.name + "/" + table + "_" + kMetadataFilename;
             std::ifstream in(filepath, std::ios::binary);
@@ -131,10 +133,14 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
         if (!ok) {
             continue;
         }
+
+        // Load the snapshot of the table if it exists.
         std::unique_ptr<VectorStore> loaded_store = persistence_manager_map_[table]->LoadSnapshot();
         if (loaded_store) {
             store_map_[table] = std::move(loaded_store);
         }
+
+        // On startup after a crash, replay the WAL to ensure durability.
         persistence_manager_map_[table]->ReplayWAL(apply_wal_entry);
         stats_manager_map_[table]->Set(StatsManager::StatType::VECTOR, store_map_[table]->GetStore().size());
     }
@@ -147,10 +153,18 @@ Engine::~Engine() {
         if (!persistence_manager_map_.contains(table)) {
             continue;
         }
+
+        // Ensure saved indexes are clean as existing soft removed nodes won't be detected on startup.
         Cleanup(table, true);
+
+        // Ensure replicas are all in sync before the WAL is cleared. This implies that currently, the primary should be shut down before the replicas, unless all replicas are already in sync.
         replica_manager_->Sync(true);
+
+        // Ensure tables can be reloaded on startup.
         persistence_manager_map_[table]->SaveSnapshot(*store);
         persistence_manager_map_[table]->SaveMetadata(store->GetVectorDimensionality(), (store->GetIndexType() == VectorStore::IndexType::HNSW ? dynamic_cast<const HNSWIndex*>(store->GetIndex())->GetConfig() : HNSWIndex::HNSWIndexConfig{}), (store->GetIndexType() == VectorStore::IndexType::FLAT ? dynamic_cast<const FlatIndex*>(store->GetIndex())->GetConfig() : FlatIndex::FlatIndexConfig{}), (cache_map_.contains(table) ? dynamic_cast<const LRUCache*>(cache_map_.at(table).get())->GetMaxCacheSize() : 32));
+
+        // Clear WAL as state has been saved, so it is no longer required for durability.
         persistence_manager_map_[table]->ClearWAL();
     }
 }
@@ -165,11 +179,14 @@ bool Engine::Insert(std::string table_name, Id id, const Vector& vector, const s
         return false;
     }
 
+    // Update the WAL ahead of time for durability and replay for primary and replicas.
     persistence_manager_map_[table_name]->AppendInsert(id, vector, content);
 
     bool ok = store_map_[table_name]->Insert(id, vector, content);
     if (ok) {
+        // Indicate the table has been modified to trigger sync on all replicas.
         stats_manager_map_[table_name]->SetModifiedFlag(true);
+
         stats_manager_map_[table_name]->Increment(StatsManager::StatType::VECTOR);
         metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::INSERT, 1);
     }
@@ -191,12 +208,17 @@ bool Engine::Remove(std::string table_name, Id id) {
         return false;
     }
 
+    // Update the WAL ahead of time for durability and replay for primary and replicas.
     persistence_manager_map_[table_name]->AppendRemove(id);
 
     bool ok = store_map_[table_name]->Remove(id);
     if (ok) {
+        // Indicate the table has been modified to trigger sync on all replicas.
         stats_manager_map_[table_name]->SetModifiedFlag(true);
+
+        // Indicate the table has had a vector removed to trigger cleanup on HNSW index.
         stats_manager_map_[table_name]->SetRemovedFlag(true);
+
         stats_manager_map_[table_name]->Increment(StatsManager::StatType::DELETED);
         stats_manager_map_[table_name]->Increment(StatsManager::StatType::STALE);
         metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::REMOVE, 1);
@@ -219,9 +241,11 @@ std::vector<VectorStore::Data> Engine::Search(std::string table_name, const Vect
         return {};
     }
 
+    // Measure search latency for metrics calculations.
     auto start = std::chrono::steady_clock::now();
     std::vector<VectorStore::Data> data = store_map_[table_name]->Search(query, k, search_param);
     auto end = std::chrono::steady_clock::now();
+
     auto duration = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()) / 1000;
     metrics_manager_map_[table_name]->CalculateSearchLatency(static_cast<float>(duration));
     metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::SEARCH, 1);
@@ -244,6 +268,7 @@ std::vector<bool> Engine::BatchInsert(std::string table_name, const std::vector<
     std::vector<bool> success_flags;
     success_flags.reserve(vectors.size());
     for (const auto& [id, vector, content] : vectors) {
+        // Update the WAL ahead of time for durability and replay for primary and replicas.
         persistence_manager_map_[table_name]->AppendInsert(id, vector, content);
 
         bool ok = store_map_[table_name]->Insert(id, vector, content);
@@ -277,12 +302,17 @@ std::vector<bool> Engine::BatchRemove(std::string table_name, std::vector<Id> id
     std::vector<bool> success_flags;
     success_flags.reserve(ids.size());
     for (const Id& id : ids) {
+        // Update the WAL ahead of time for durability and replay for primary and replicas.
         persistence_manager_map_[table_name]->AppendRemove(id);
 
         bool ok = store_map_[table_name]->Remove(id);
         if (ok) {
+            // Indicate the table has been modified to trigger sync on all replicas.
             stats_manager_map_[table_name]->SetModifiedFlag(true);
+
+            // Indicate the table has had a vector removed to trigger cleanup on HNSW index.
             stats_manager_map_[table_name]->SetRemovedFlag(true);
+
             stats_manager_map_[table_name]->Increment(StatsManager::StatType::DELETED);
             stats_manager_map_[table_name]->Increment(StatsManager::StatType::STALE);
             metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::REMOVE, 1);
@@ -309,6 +339,7 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
         }
     }
 
+    // Generate a unique hash as a key for the cache to store batch search request results.
     auto hash_key = [&](){
         std::size_t hash = requests.size();
         for (const auto& [vector, k, search_param] : requests) {
@@ -327,6 +358,7 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
         }
         std::optional<Cache::CacheEntry> cache_entry = cache_map_[table_name]->Get(hash_key);
         if (cache_entry.has_value()) {
+            // Return batched search results found directly in cache.
             metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::CACHE_HIT, 1);
             return [&]() {
                 std::vector<std::vector<VectorStore::Data>> results;
@@ -344,12 +376,15 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
         metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::CACHE_MISS, 1);
     }
 
+    // Use a thread pool to schedule search requests in parallel.
     std::vector<std::future<std::vector<VectorStore::Data>>> futures;
     for (const auto& [query, k, search_param] : requests) {
         futures.push_back(thread_pool_->EnqueueTask([this, table_name, query, k, search_param]() {
+            // Measure search latency for metric calculations.
             auto start = std::chrono::steady_clock::now();
             std::vector<VectorStore::Data> data = store_map_[table_name]->Search(query, k, search_param);
             auto end = std::chrono::steady_clock::now();
+
             auto duration = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()) / 1000;
             metrics_manager_map_[table_name]->CalculateSearchLatency(static_cast<float>(duration));
             metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::SEARCH, 1);
@@ -364,6 +399,7 @@ std::vector<std::vector<VectorStore::Data>> Engine::BatchSearch(std::string tabl
     }
 
     if (metadata_.use_cache) {
+        // Save new batch results to the cache.
         Cache::CacheEntry new_entry = [&]() {
             Cache::CacheEntry entry;
             entry.data.reserve(results.size());
@@ -431,6 +467,8 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, const HNSW
     std::unique_ptr<VectorIndex> index = nullptr;
     VectorStore::IndexType index_type = VectorStore::IndexType::FLAT;
     VectorPersistenceManager::StoredIndexType stored_index_type = VectorPersistenceManager::StoredIndexType::FLAT;
+
+    // Check which index has been specified and create the relevant index.
     if (hnsw_index_config.m != 0 && hnsw_index_config.m0 != 0 && hnsw_index_config.ef_construction != 0 && hnsw_index_config.vector_dimensionality != 0) {
         index = std::make_unique<vector_db_engine::HNSWIndex>(hnsw_index_config);
         index_type = VectorStore::IndexType::HNSW;
@@ -442,6 +480,7 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, const HNSW
     }
 
     {
+        // Create a temporary persistence manager to update the WAL ahead of time for durability and replay for primary and replicas.
         auto temporary_persistence_manager = std::make_unique<VectorPersistenceManager>(metadata_.name, stored_index_type, store_snapshot, index_snapshot, write_ahead_log, metadata, logger_.get());
         temporary_persistence_manager->AppendCreate(hnsw_index_config, flat_index_config, cache_size);
     }
@@ -458,6 +497,7 @@ bool Engine::CreateTable(std::string name, int vector_dimensionality, const HNSW
     metrics_manager_map_[name] = std::move(metrics_manager);
     cache_map_[name] = std::move(lru_cache);
 
+    // Indicate table has been modified to trigger sync of table creation on replicas.
     stats_manager_map_[name]->SetModifiedFlag(true);
 
     return true;
@@ -480,6 +520,8 @@ bool Engine::CreateTableOnReplica(std::string name, int vector_dimensionality, c
     std::unique_ptr<VectorIndex> index = nullptr;
     VectorStore::IndexType index_type = VectorStore::IndexType::FLAT;
     VectorPersistenceManager::StoredIndexType stored_index_type = VectorPersistenceManager::StoredIndexType::FLAT;
+
+    // Check which index has been specified and create the relevant index.
     if (hnsw_index_config.m != 0 && hnsw_index_config.m0 != 0 && hnsw_index_config.ef_construction != 0 && hnsw_index_config.vector_dimensionality != 0) {
         index = std::make_unique<vector_db_engine::HNSWIndex>(hnsw_index_config);
         index_type = VectorStore::IndexType::HNSW;
@@ -519,9 +561,13 @@ bool Engine::DropTable(std::string name) {
         return false;
     }
 
+    // Indicate table has been modified to trigger sync on all replicas.
     stats_manager_map_[name]->SetModifiedFlag(true);
 
+    // Update the WAL ahead of time for durability and replay for primary and replicas.
     persistence_manager_map_[name]->AppendDrop();
+
+    // Trigger sync directly before the table is destroyed on the primary.
     replica_manager_->Sync(true);
 
     persistence_manager_map_[name]->Clear();
@@ -571,6 +617,7 @@ void Engine::Cleanup(const std::string& table_name, bool force) {
         return;
     }
 
+    // Calculate the percentage of deleted vectors to check whether a reindex would be needed.
     StatsManager::Stats stats = stats_manager_map_[table_name]->GetStats();
     float ratio = 0;
     if (stats.vector_count + stats.stale_count - stats.deleted_count > 0) {
@@ -581,7 +628,9 @@ void Engine::Cleanup(const std::string& table_name, bool force) {
     store_map_[table_name]->Cleanup(reindex);
     metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::CLEANUP, 1);
 
+    // Reset the removed flag to avoid unnecessary cleanups.
     stats_manager_map_[table_name]->SetRemovedFlag(false);
+
     stats_manager_map_[table_name]->AdjustForDeletions();
     stats_manager_map_[table_name]->Reset(StatsManager::StatType::DELETED);
 
@@ -600,9 +649,13 @@ bool Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
         const auto& cache_config = config.cache_config();
 
         bool ok = false;
+
+        // Populate both configurations, where one should be constructed from Protobuf default values, indicating that it is not the right configuration. These will be validated when creating the table.
         HNSWIndex::HNSWIndexConfig hnsw_index_config = {hnsw_config.m(), hnsw_config.m0(), hnsw_config.ef_construction(), hnsw_config.ml(), (hnsw_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine), hnsw_config.vector_dimensionality()};
         FlatIndex::FlatIndexConfig flat_index_config = {flat_config.vector_dimensionality(), (flat_config.distance_metric() == vector_db::WALEntry::CreateConfig::L2 ? VectorIndex::DistanceMetric::L2 : VectorIndex::DistanceMetric::Cosine)};
+
         if (metadata_.primary) {
+            // This case should currently never be used, but can be used in the future.
             ok = CreateTable(entry.table(), store_config.vector_dimensionality(), hnsw_index_config, flat_index_config, cache_config.cache_size());
         } else {
             std::unique_lock replica_lock(replica_mutex_);
@@ -614,6 +667,7 @@ bool Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
         const auto& config = entry.drop_config();
         bool ok = false;
         if (metadata_.primary) {
+            // This case should currently never be used, but can be used in the future.
             ok = DropTable(entry.table());
         } else {
             std::unique_lock replica_lock(replica_mutex_);
@@ -627,6 +681,8 @@ bool Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
     if (!store_map_.contains(entry.table()) || !stats_manager_map_.contains(entry.table())) {
         return false;
     }
+
+    // Replay insert or remove operations against in-memory store directly.
     if (entry.type() == vector_db::WALEntry::INSERT) {
         const auto& config = entry.insert_config();
         Vector vector(config.vector().begin(), config.vector().end());

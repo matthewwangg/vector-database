@@ -3,6 +3,8 @@
 
 #include "local_logger.h"
 
+namespace vector_db_engine {
+
 void LocalLogger::Info(const std::string& message, const std::string& name) {
     std::cout << GetTimestamp() << " [INFO] [" << name << "] [127.0.0.1] " << message << std::endl;
 }
@@ -22,3 +24,7 @@ std::string LocalLogger::GetTimestamp() {
     std::strftime(buffer, sizeof(buffer), "%H:%M:%S", std::localtime(&t));
     return "[" + std::string(buffer) + "]";
 }
+
+} // namespace vector_db_engine
+
+

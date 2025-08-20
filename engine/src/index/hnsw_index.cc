@@ -29,6 +29,7 @@ HNSWIndex::HNSWIndex(const HNSWIndexConfig& config, int max_level, std::optional
       nodes_(nodes),
       node_levels_(node_levels)
 {
+    // If snapshot didn't have an entry point, set a new one from the highest level.
     if (!entry_point_.has_value()) {
         for (const auto& [id, node] : nodes_) {
             if (node.level == max_level_ && node.active) {
@@ -56,6 +57,7 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
     };
     node_levels_[new_level].insert(id);
 
+    // First node inserted becomes the entry point.
     if (!entry_point_.has_value()) {
         entry_point_ = id;
         max_level_ = new_level;
@@ -64,6 +66,7 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
 
     Id entry_point = entry_point_.value();
 
+    // Greedy descent to the insertion level.
     for (int l = max_level_; l > new_level; --l) {
         std::vector<Id> nearest = SearchLevel(vector, entry_point, 1, l);
         if (nearest.empty()) {
@@ -72,6 +75,7 @@ void HNSWIndex::Insert(Id id, const Vector& vector) {
         entry_point = nearest[0];
     }
 
+    // Connect the node at all levels from insertion level to 0 and prune neighbors if needed.
     for (int l = std::min(max_level_, new_level); l > -1; --l) {
         std::vector<Id> nearest = SearchLevel(vector, entry_point, config_.ef_construction, l);
         std::vector<Id> neighbors = SelectNeighbors(vector, nearest, l);
@@ -107,6 +111,7 @@ void HNSWIndex::Remove(Id id) {
     entry_point_ = std::nullopt;
     int new_highest_level = max_level_;
 
+    // If removing the entry point, pick the next highest node that is active.
     while (!entry_point_.has_value() && new_highest_level >= 0) {
         if (node_levels_.contains(new_highest_level)) {
             for (auto& candidate : node_levels_.at(new_highest_level)) {
@@ -131,6 +136,7 @@ std::vector<Id> HNSWIndex::Search(const Vector& query, std::size_t k, std::size_
 
     Id entry_point = entry_point_.value();
 
+    // Greedy descent from the highest level.
     for (int l = max_level_; l > 0; --l) {
         std::vector<Id> nearest = SearchLevel(query, entry_point, ef_search, l);
 
@@ -154,6 +160,7 @@ std::vector<Id> HNSWIndex::SearchLevel(const Vector& query, std::optional<Id> en
         return {};
     }
 
+    // Greedy exploration with min-heap candidates (by distance) and max-heap top_ef (keeping ef best candidates by distance).
     std::priority_queue<std::pair<float, Id>, std::vector<std::pair<float, Id>>, std::greater<>> candidates;
     std::priority_queue<std::pair<float, Id>> top_ef;
     std::unordered_set<Id> visited;
@@ -240,6 +247,7 @@ void HNSWIndex::Cleanup() {
 
         for (auto& [level, neighbors] : node.neighbors) {
             for (auto neighbor_it = neighbors.begin(); neighbor_it != neighbors.end();) {
+                // Clean up the soft removed nodes (marked as inactive).
                 if (!nodes_.contains(*neighbor_it) || !nodes_.at(*neighbor_it).active) {
                     neighbor_it = neighbors.erase(neighbor_it);
                     continue;
@@ -369,6 +377,7 @@ void HNSWIndex::ConnectNeighbors(Id node_id, const Vector& vector, const std::ve
             max_neighbors = config_.m0;
         }
 
+        // Prune neighbors down to max_neighbors.
         if (e_conn.size() > max_neighbors) {
             std::vector<Id> candidates(e_conn.begin(), e_conn.end());
             std::vector<Id> e_new_conn = SelectNeighbors(nodes_[neighbor_id].vector, candidates, level);
@@ -388,6 +397,7 @@ void HNSWIndex::ConnectNeighbors(Id node_id, const Vector& vector, const std::ve
 }
 
 int HNSWIndex::GetRandomLevel(Id id) const {
+    // Randomly select a level (deterministically by ID).
     std::mt19937 random_engine(std::hash<Id>{}(id));
     return static_cast<int>(-std::log(1.0 - level_distribution_(random_engine)) * config_.ml);
 }

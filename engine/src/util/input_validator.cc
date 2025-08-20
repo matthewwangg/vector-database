@@ -48,15 +48,16 @@ bool InputValidator::ValidateCreateTable(const std::string& name, int vector_dim
         return false;
     }
 
+    // Indicate input is invalid if both or neither configuration is empty.
     bool is_hnsw_index_config_empty = hnsw_index_config.vector_dimensionality == 0 && hnsw_index_config.m == 0 && hnsw_index_config.m0 == 0 && hnsw_index_config.ef_construction == 0 && hnsw_index_config.ml == 0.0f;
     bool is_flat_index_config_empty = flat_index_config.vector_dimensionality == 0;
     if ((is_hnsw_index_config_empty && is_flat_index_config_empty) || (!is_hnsw_index_config_empty && !is_flat_index_config_empty)) {
         return false;
     }
 
+    // Indicate input is invalid if the non-empty configuration is invalid.
     bool is_hnsw_index_config_valid = hnsw_index_config.vector_dimensionality != 0 && hnsw_index_config.m != 0 && hnsw_index_config.m0 != 0 && hnsw_index_config.ef_construction != 0 && hnsw_index_config.ml != 0.0f;
     bool is_flat_index_config_valid = flat_index_config.vector_dimensionality != 0;
-
     if ((!is_hnsw_index_config_empty && !is_hnsw_index_config_valid) || (!is_flat_index_config_empty &&!is_flat_index_config_valid)) {
         return false;
     }

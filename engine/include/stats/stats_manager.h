@@ -7,6 +7,7 @@
 
 namespace vector_db_engine {
 
+// StatsManager is responsible for keeping metadata about the vector database table, including the count of vectors, as well as the count of deleted vectors and stale vectors for the HNSW index cleanup.
 class StatsManager {
 public:
     struct Stats {
@@ -21,18 +22,29 @@ public:
         STALE = 2,
     };
 
+    // Create stats manager with modified and removed flags defaulting to false.
     StatsManager();
 
     Stats GetStats() const;
     bool GetModifiedFlag() const;
     bool GetRemovedFlag() const;
 
+    // Update the specified stat type by 1.
     void Increment(StatType stat_type);
+
+    // Set the specified stat type to 0.
     void Reset(StatType stat_type);
+
+    // Set the specified stat type to the given value.
     void Set(StatType stat_type, int value);
+
+    // Update the vector count based on the number of nodes deleted.
     void AdjustForDeletions();
 
+    // Set the modified flag to the given boolean value.
     void SetModifiedFlag(bool value);
+
+    // Set the removed flag to the given boolean value.
     void SetRemovedFlag(bool value);
 
 private:

@@ -33,14 +33,25 @@ public:
         bool active;
     };
 
+    // Creates the HNSW index without any previous data to load.
     explicit HNSWIndex(const HNSWIndexConfig& config);
+
+    // Creates the HNSW index and initializes it with the loaded previous data.
     explicit HNSWIndex(const HNSWIndexConfig& config, int max_level, std::optional<Id> entry_point, std::unordered_map<Id, Node> nodes, std::unordered_map<int, std::unordered_set<Id>> node_levels);
 
+    // Insert the vector into the HNSW index.
     void Insert(Id id, const Vector& vector) override;
+
+    // Remove the vector by ID from the HNSW index. This is a soft remove that will be properly removed during cleanup.
     void Remove(Id id) override;
+
+    // Search the HNSW index for the k-nearest neighbors (or approximate nearest neighbors) to the query vector.
     std::vector<Id> Search(const Vector& query, std::size_t k, std::size_t ef_search) const override;
 
+    // Remove all the previously soft removed vectors to keep the index clean.
     void Cleanup() override;
+
+    // Reindex the HNSW index to mitigate index degradation by removals.
     void Reindex() override;
 
     const std::unordered_map<Id, Node>& GetNodes() const { return nodes_; }
@@ -52,13 +63,22 @@ public:
     std::optional<Id> GetEntryPoint() const { return entry_point_; }
 
 private:
+    // Greedy search on a single level.
     std::vector<Id> SearchLevel(const Vector& query, std::optional<Id> entry_point, std::size_t ef, int level) const;
+
+    // Select the closest m/m0 neighbors to the query vector from the candidate vectors.
     std::vector<Id> SelectNeighbors(const Vector& query, const std::vector<Id>& candidates, int level) const;
 
+    // Insert the vector into the index without locking the mutex. Used by the reindex method.
     void InsertNoLock(Id id, const Vector& vector);
 
+    // Compute the distance between two vectors using the configured distance metric.
     float ComputeDistance(const Vector& a, const Vector& b) const;
+
+    // Connects the node to its neighbors bidirectionally.
     void ConnectNeighbors(Id node_id, const Vector& vector, const std::vector<Id>& neighbors, int level);
+
+    // Generate a random node level given the ID.
     int GetRandomLevel(Id id) const;
 
     HNSWIndexConfig config_;

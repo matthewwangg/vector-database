@@ -15,6 +15,7 @@ namespace vector_db_engine {
 using Id = std::uint64_t;
 using Vector = std::vector<float>;
 
+// VectorStore is responsible for storage of the id, vector data, and content in memory, thread-safe write operations, ownership of the vector index, and checksum computation of the data currently stored in the vector database.
 class VectorStore {
 public:
     struct Data {
@@ -28,15 +29,25 @@ public:
         FLAT,
     };
 
+    // Creates the vector store without any previous data to load.
     explicit VectorStore(IndexType index_type, std::unique_ptr<VectorIndex> index, int vector_dimensionality);
+
+    // Creates the vector store and loads the previous data into the store directly.
     explicit VectorStore(IndexType index_type, std::unique_ptr<VectorIndex> index, int vector_dimensionality, std::unordered_map<Id, Data> data);
 
+    // Insert the data into the vector store. Returns true on success and false on failure.
     bool Insert(Id id, const Vector& vector, const std::string& content);
+
+    // Remove the data by ID from the vector store. Returns true on success and false on failure.
     bool Remove(Id id);
+
+    // Search for the nearest data to the query, using the index. Returns the relevant data on success and returns an empty vector on failure.
     std::vector<Data> Search(const Vector& query, std::size_t k, std::size_t search_param) const;
 
+    // Trigger the cleanup of the soft removed index nodes for HNSW index.
     void Cleanup(bool reindex);
 
+    // Compute the deterministic checksum of the data for replica sync validation using the IDs and content.
     std::uint64_t ComputeChecksum();
 
     const std::unordered_map<Id, Data>& GetStore() const { return store_; }
