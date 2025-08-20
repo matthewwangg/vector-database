@@ -32,7 +32,7 @@ public:
     // Update the specified stat type by 1.
     void Increment(StatType stat_type);
 
-    // Set the specified stat type to 0.
+    // Set the specified stat type to 0 by using the Set method.
     void Reset(StatType stat_type);
 
     // Set the specified stat type to the given value.

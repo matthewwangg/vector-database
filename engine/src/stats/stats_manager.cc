@@ -39,18 +39,7 @@ void StatsManager::Increment(StatsManager::StatType stat_type) {
 }
 
 void StatsManager::Reset(StatsManager::StatType stat_type) {
-    std::unique_lock lock(stats_mutex_);
-    switch (stat_type) {
-        case StatType::VECTOR:
-            stats_.vector_count = 0;
-            break;
-        case StatType::DELETED:
-            stats_.deleted_count = 0;
-            break;
-        case StatType::STALE:
-            stats_.stale_count = 0;
-            break;
-    }
+    Set(stat_type, 0);
 }
 
 void StatsManager::Set(StatsManager::StatType stat_type, int value) {
