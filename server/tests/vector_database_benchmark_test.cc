@@ -18,7 +18,7 @@
 class VectorDatabaseBenchmarkTests : public ::testing::Test {
 protected:
     void SetUp() override {
-        std::string name = "unit_test_primary";
+        std::string name = "unit_test";
         std::string server_address = "localhost:50051";
         bool primary = true;
         float reindex_threshold = 0.25f;
