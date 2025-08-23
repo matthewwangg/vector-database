@@ -144,6 +144,10 @@ grpc::Status VectorDatabaseServiceImpl::Metrics(grpc::ServerContext* context, co
     response->set_min_search_latency_ms(metrics.min_search_latency_ms);
     response->set_max_search_latency_ms(metrics.max_search_latency_ms);
 
+    response->set_average_cleanup_latency_ms(metrics.average_cleanup_latency_ms);
+    response->set_min_cleanup_latency_ms(metrics.min_cleanup_latency_ms);
+    response->set_max_cleanup_latency_ms(metrics.max_cleanup_latency_ms);
+
     response->set_cache_hit(metrics.cache_hit);
     response->set_cache_miss(metrics.cache_miss);
 

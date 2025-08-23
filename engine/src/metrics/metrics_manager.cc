@@ -47,4 +47,14 @@ void MetricsManager::CalculateSearchLatency(float latency) {
     metrics_.min_search_latency_ms = std::min(metrics_.min_search_latency_ms, latency);
 }
 
+void MetricsManager::CalculateCleanupLatency(float latency) {
+    std::unique_lock lock(metrics_mutex_);
+
+    // Update the average cleanup latency using the current average latency, the new latency, and the new cleanup count.
+    metrics_.average_cleanup_latency_ms = ((metrics_.average_cleanup_latency_ms * metrics_.cleanup_count) + latency) / (metrics_.cleanup_count + 1);
+
+    metrics_.max_cleanup_latency_ms = std::max(metrics_.max_cleanup_latency_ms, latency);
+    metrics_.min_cleanup_latency_ms = std::min(metrics_.min_cleanup_latency_ms, latency);
+}
+
 } // namespace vector_db_engine

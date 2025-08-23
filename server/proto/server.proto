@@ -139,6 +139,10 @@ message MetricsResponse {
   float max_search_latency_ms = 7;
   float min_search_latency_ms = 8;
 
+  float average_cleanup_latency_ms = 11;
+  float max_cleanup_latency_ms = 12;
+  float min_cleanup_latency_ms = 13;
+
   uint64 cache_hit = 9;
   uint64 cache_miss = 10;
 }

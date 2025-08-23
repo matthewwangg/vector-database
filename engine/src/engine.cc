@@ -80,7 +80,7 @@ Engine::Engine(std::string name, bool primary, float reindex_threshold, bool use
     thread_pool_ = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
     input_validator_ = std::make_unique<InputValidator>();
     replica_manager_ = std::make_unique<ReplicaManager>(metadata_.name, metadata_.primary, metadata_.sync_server_address, metadata_.replicas, metadata_.sync_interval, shutdown_, apply_wal_entry, get_persistence_manager_map, get_stats_manager_map, get_store_map, logger_.get());
-    cleaner_ = std::make_unique<Cleaner>(metadata_.name, metadata_.cleanup_interval, shutdown_, cleanup, get_store_map, get_stats_manager_map, logger_.get());
+    cleaner_ = std::make_unique<Cleaner>(metadata_.cleanup_interval, shutdown_, cleanup, get_store_map, get_stats_manager_map);
 
     // Discover tables to restore by scanning for WAL files, empty or not.
     std::vector<std::string> table_names = [&]() {
@@ -625,7 +625,14 @@ void Engine::Cleanup(const std::string& table_name, bool force) {
     }
     bool reindex = ratio > metadata_.reindex_threshold;
 
+    // Measure the latency of the cleanup operation.
+    auto start = std::chrono::steady_clock::now();
     store_map_[table_name]->Cleanup(reindex);
+    auto end = std::chrono::steady_clock::now();
+    auto duration_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000;
+    logger_->Info("cleanup completed in " + std::to_string(static_cast<float>(duration_ms)) + " ms", metadata_.name);
+
+    metrics_manager_map_[table_name]->CalculateCleanupLatency(static_cast<float>(duration_ms));
     metrics_manager_map_[table_name]->Increment(MetricsManager::CountType::CLEANUP, 1);
 
     // Reset the removed flag to avoid unnecessary cleanups.

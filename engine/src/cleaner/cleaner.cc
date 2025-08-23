@@ -15,14 +15,12 @@
 
 namespace vector_db_engine {
 
-Cleaner::Cleaner(const std::string& name, int cleanup_interval, std::atomic<bool>& shutdown, const std::function<void(const std::string&, bool)>& cleanup_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()>& get_store_map_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()>& get_stats_manager_map_callback,  Logger* logger)
-    : name_(name),
-      cleanup_interval_(cleanup_interval),
+Cleaner::Cleaner(int cleanup_interval, std::atomic<bool>& shutdown, const std::function<void(const std::string&, bool)>& cleanup_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()>& get_store_map_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()>& get_stats_manager_map_callback)
+    : cleanup_interval_(cleanup_interval),
       shutdown_(shutdown),
       cleanup_callback_(cleanup_callback),
       get_store_map_callback_(get_store_map_callback),
-      get_stats_manager_map_callback_(get_stats_manager_map_callback),
-      logger_(logger)
+      get_stats_manager_map_callback_(get_stats_manager_map_callback)
 {
     cleanup_thread_ = std::thread(&Cleaner::BackgroundCleanupLoop, this);
 }
@@ -46,12 +44,7 @@ void Cleaner::BackgroundCleanupLoop() {
         const auto& stats_manager_map = get_stats_manager_map_callback_();
         for (auto& [table, store] : store_map) {
             if (stats_manager_map.contains(table) && stats_manager_map.at(table)->GetRemovedFlag()) {
-                // Measure the latency of the cleanup operation.
-                auto start = std::chrono::steady_clock::now();
                 cleanup_callback_(table, false);
-                auto end = std::chrono::steady_clock::now();
-                auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-                logger_->Info("cleanup completed in " + std::to_string(duration_ms) + " ms", name_);
             }
         }
     }

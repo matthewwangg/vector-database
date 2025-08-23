@@ -22,6 +22,10 @@ public:
         float max_search_latency_ms = 0.0f;
         float min_search_latency_ms = std::numeric_limits<float>::max();
 
+        float average_cleanup_latency_ms = 0.0f;
+        float max_cleanup_latency_ms = 0.0f;
+        float min_cleanup_latency_ms = std::numeric_limits<float>::max();
+
         uint64_t cache_hit = 0;
         uint64_t cache_miss = 0;
     };
@@ -45,6 +49,9 @@ public:
 
     // Calculate the minimum, maximum, and average search latency on each search.
     void CalculateSearchLatency(float latency);
+
+    // Calculate the minimum, maximum, and average cleanup latency on each cleanup.
+    void CalculateCleanupLatency(float latency);
 
 private:
     Metrics metrics_;

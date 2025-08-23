@@ -46,4 +46,16 @@ TEST_F(MetricsManagerTest, CalculateSearchLatency) {
     EXPECT_EQ(metrics_manager_->GetMetrics().min_search_latency_ms, 10);
 }
 
+TEST_F(MetricsManagerTest, CalculateCleanupLatency) {
+    metrics_manager_->CalculateCleanupLatency(10);
+    metrics_manager_->Increment(MetricsManager::CountType::CLEANUP, 1);
+
+    metrics_manager_->CalculateCleanupLatency(30);
+    metrics_manager_->Increment(MetricsManager::CountType::CLEANUP, 1);
+
+    EXPECT_EQ(metrics_manager_->GetMetrics().average_cleanup_latency_ms, 20);
+    EXPECT_EQ(metrics_manager_->GetMetrics().max_cleanup_latency_ms, 30);
+    EXPECT_EQ(metrics_manager_->GetMetrics().min_cleanup_latency_ms, 10);
+}
+
 } // namespace vector_db_engine

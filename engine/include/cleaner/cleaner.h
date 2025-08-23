@@ -20,7 +20,7 @@ class Engine;
 class Cleaner {
 public:
     // Create the cleaner and start the background cleanup loop.
-    explicit Cleaner(const std::string& name, int cleanup_interval, std::atomic<bool>& shutdown, const std::function<void(const std::string&, bool)>& cleanup_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()>& get_store_map_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()>& get_stats_manager_map_callback, Logger* logger);
+    explicit Cleaner(int cleanup_interval, std::atomic<bool>& shutdown, const std::function<void(const std::string&, bool)>& cleanup_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<VectorStore>>&()>& get_store_map_callback, const std::function<const std::unordered_map<std::string, std::unique_ptr<StatsManager>>&()>& get_stats_manager_map_callback);
 
     // Ensure graceful shutdown by joining the background thread.
     ~Cleaner();
@@ -29,7 +29,6 @@ public:
     void BackgroundCleanupLoop();
 
 private:
-    std::string name_;
     int cleanup_interval_;
 
     // Indicates to the background thread to shut down gracefully.
@@ -44,8 +43,6 @@ private:
     std::thread cleanup_thread_;
     std::condition_variable cleanup_cv_;
     std::mutex cleanup_mutex_;
-
-    Logger* logger_;
 };
 
 } // namespace vector_db_engine
