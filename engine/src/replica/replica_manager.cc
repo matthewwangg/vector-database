@@ -125,7 +125,7 @@ void ReplicaManager::Sync(bool force) {
         }
         for (const auto& replica : replicas_) {
             // Retry the sync operation a constant kRetryCount number of times.
-            for (int i = 0; i < kRetryCount; ++i) {
+            for (int i = 0; i < kRetryCount+1; ++i) {
                 vector_db::SyncRequest request;
                 std::vector<vector_db::WALEntry> entries = persistence_manager->SerializeWALEntries(wal_offsets_per_replica_map_[table][replica]);
                 if (entries.empty()) {
@@ -155,7 +155,9 @@ void ReplicaManager::Sync(bool force) {
                     failed = true;
                     logger_->Error("replica out of sync: " + replica, name_);
                 } else {
-                    failed = true;
+                    if (i == kRetryCount-1) {
+                        failed = true;
+                    }
                     logger_->Error("error in updating replica: " + replica, name_);
                 }
             }
