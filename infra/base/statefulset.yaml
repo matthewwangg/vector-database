@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vector-database
+spec:
+  selector:
+    matchLabels:
+      app: vector-database
+  serviceName: vector-database-service
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: vector-database
+    spec:
+      containers:
+        - name: vector-database-node
+          image: us-west1-docker.pkg.dev/vector-database-471002/vector-database/vector-database:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 50051
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: PORT
+              value: "50051"
+            - name: MODE
+              value: "K8S"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "100m"
+              memory: "256Mi"
