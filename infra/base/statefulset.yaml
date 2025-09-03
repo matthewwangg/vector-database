@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vector-database
+spec:
+  selector:
+    matchLabels:
+      app: vector-database
+  serviceName: vector-database-internal-service
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: vector-database
+    spec:
+      containers:
+        - name: vector-database-node
+          image: us-west1-docker.pkg.dev/vector-database-471002/vector-database/vector-database:latest
+          imagePullPolicy: Always
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - |
+              if [ "$POD_NAME" = "vector-database-0" ]; then
+                exec /vector-database/vector_db_server "$POD_NAME" "0.0.0.0:$PORT" --replica-address vector-database-1.vector-database-internal-service:50052
+              else
+                exec /vector-database/vector_db_server "$POD_NAME" "0.0.0.0:$PORT" --replica --sync-server-address 0.0.0.0:50052
+              fi
+          ports:
+            - name: grpc
+              containerPort: 50051
+            - name: replication
+              containerPort: 50052
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: PORT
+              value: "50051"
+            - name: MODE
+              value: "K8S"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "100m"
+              memory: "256Mi"
