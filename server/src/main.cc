@@ -33,13 +33,23 @@ int main(int argc, char* argv[]) {
     std::signal(SIGINT, HandleSignals);
     std::signal(SIGTERM, HandleSignals);
 
-    if (argc < 3) {
-        std::cout << "usage: " << argv[0] << " <name> <server-address> [flags]" << std::endl;
-        return 1;
-    }
+    std::string name;
+    std::string server_address;
 
-    std::string name = argv[1];
-    std::string server_address = argv[2];
+    if (argc < 3) {
+        const char* pod = std::getenv("POD_NAME");
+        const char* port = std::getenv("PORT");
+        const char* mode = std::getenv("MODE");
+        if (!pod || !port || std::string(mode) != "K8S") {
+            std::cout << "usage: " << argv[0] << " <name> <server-address> [flags]" << std::endl;
+            return 1;
+        }
+        name = pod;
+        server_address = std::string("0.0.0.0:") + port;
+    } else {
+        name = argv[1];
+        server_address = argv[2];
+    }
 
     // Default values if no flags are set.
     bool primary = true;
