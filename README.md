@@ -69,6 +69,37 @@ docker run -it --rm --network=vec-net --name=replica1 \
   --replica --sync-server-address=0.0.0.0:50053
 ```
 
+### 📦 Kubernetes
+
+Build and push the image:
+```bash
+gcloud auth configure-docker us-west1-docker.pkg.dev
+
+docker build -t us-west1-docker.pkg.dev/<PROJECT_ID>/vector-database/vector-database:latest .
+docker push us-west1-docker.pkg.dev/<PROJECT_ID>/vector-database/vector-database:latest
+```
+
+Apply the manifests:
+```bash
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/statefulset.yaml
+```
+
+Check status:
+```bash
+kubectl get pods -l app=vector-database
+kubectl logs -f vector-database-0
+```
+
+Scale:
+```bash
+kubectl scale statefulset vector-database --replicas=3
+```
+
+Access inside the cluster:
+- Primary: `vector-database-0.vector-database-internal-service:50051`
+- Replica(s): `vector-database-1.vector-database-internal-service:50051`
+
 ### 🧪 Run Locally
 Build with CMake:
 ```
