@@ -13,13 +13,13 @@ public:
     SilentLogger() = default;
 
     // No output.
-    void Info(const std::string& message, const std::string& name) override;
+    void Info(const std::string& message, const std::string& name) const override;
 
     // No output.
-    void Warn(const std::string& message, const std::string& name) override;
+    void Warn(const std::string& message, const std::string& name) const override;
 
     // No output.
-    void Error(const std::string& message, const std::string& name) override;
+    void Error(const std::string& message, const std::string& name) const override;
 };
 
 } // namespace vector_db_engine

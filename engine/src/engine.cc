@@ -713,7 +713,7 @@ bool Engine::ApplyWALEntry(const vector_db::WALEntry& entry) {
     return false;
 }
 
-Logger* Engine::GetLogger() const {
+const Logger* Engine::GetLogger() const {
     return logger_.get();
 }
 

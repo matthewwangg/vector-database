@@ -13,17 +13,17 @@ public:
     LocalLogger() = default;
 
     // Print INFO type message to stdout.
-    void Info(const std::string& message, const std::string& name) override;
+    void Info(const std::string& message, const std::string& name) const override;
 
     // Print WARN type message to stdout.
-    void Warn(const std::string& message, const std::string& name) override;
+    void Warn(const std::string& message, const std::string& name) const override;
 
     // Print ERROR type message to stdout.
-    void Error(const std::string& message, const std::string& name) override;
+    void Error(const std::string& message, const std::string& name) const override;
 
 private:
     // Get the system timestamp.
-    std::string GetTimestamp();
+    std::string GetTimestamp() const;
 };
 
 } // namespace vector_db_engine

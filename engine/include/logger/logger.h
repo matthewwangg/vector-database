@@ -11,13 +11,13 @@ public:
     virtual ~Logger() = default;
 
     // Log an INFO type message.
-    virtual void Info(const std::string& message, const std::string& name) = 0;
+    virtual void Info(const std::string& message, const std::string& name) const = 0;
 
     // Log a WARN type message.
-    virtual void Warn(const std::string& message, const std::string& name) = 0;
+    virtual void Warn(const std::string& message, const std::string& name) const = 0;
 
     // Log an ERROR type message.
-    virtual void Error(const std::string& message, const std::string& name) = 0;
+    virtual void Error(const std::string& message, const std::string& name) const = 0;
 };
 
 } // namespace vector_db_engine

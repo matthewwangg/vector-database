@@ -102,7 +102,7 @@ public:
     // Apply the WAL entry received from the primary. Should only run on the replicas.
     bool ApplyWALEntry(const vector_db::WALEntry& entry);
 
-    Logger* GetLogger() const;
+    const Logger* GetLogger() const;
 
 private:
     Metadata metadata_;

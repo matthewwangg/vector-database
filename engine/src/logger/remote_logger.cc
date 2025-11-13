@@ -14,19 +14,19 @@ RemoteLogger::RemoteLogger(const std::string& logger_address) {
     stub_ = logging::LogService::NewStub(grpc::CreateChannel(logger_address, grpc::InsecureChannelCredentials()));
 }
 
-void RemoteLogger::Info(const std::string& message, const std::string& name) {
+void RemoteLogger::Info(const std::string& message, const std::string& name) const {
     SendLog("INFO", message, name);
 }
 
-void RemoteLogger::Warn(const std::string& message, const std::string& name) {
+void RemoteLogger::Warn(const std::string& message, const std::string& name) const {
     SendLog("WARNING", message, name);
 }
 
-void RemoteLogger::Error(const std::string& message, const std::string& name) {
+void RemoteLogger::Error(const std::string& message, const std::string& name) const {
     SendLog("ERROR", message, name);
 }
 
-void RemoteLogger::SendLog(const std::string& level, const std::string& message, const std::string source) {
+void RemoteLogger::SendLog(const std::string& level, const std::string& message, const std::string source) const {
     logging::LogEntry entry;
     entry.set_level(level);
     entry.set_message(message);
