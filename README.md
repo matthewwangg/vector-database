@@ -101,13 +101,6 @@ Access inside the cluster:
 - Replica(s): `vector-database-1.vector-database-internal-service:50051`
 
 ### 🧪 Run Locally
-Build with CMake:
-```
-mkdir build && cd build
-cmake ..
-make -j
-```
-
 Generate gRPC dependencies with protoc:
 ```
 # Engine protos
@@ -124,6 +117,13 @@ protoc --proto_path=server/proto \
        --grpc_out=server/proto \
        --plugin=protoc-gen-grpc=`which grpc_cpp_plugin` \
        server/proto/*.proto
+```
+
+Build with CMake:
+```
+mkdir build && cd build
+cmake ..
+make -j
 ```
 
 Run a primary server:
